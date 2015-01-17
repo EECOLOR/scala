@@ -256,15 +256,8 @@ trait Implicits {
 
   /** An extractor for types of the form ? { name: (? >: argtpe <: Any*)restp }
    */
-  object HasMethodMatching {
-    val dummyMethod = NoSymbol.newTermSymbol("typer$dummy") setInfo NullaryMethodType(AnyTpe)
+  private object HasMethodMatching {
 
-    def templateArgType(argtpe: Type) = new BoundedWildcardType(TypeBounds.lower(argtpe))
-
-    def apply(name: Name, argtpes: List[Type], restpe: Type): Type = {
-      val mtpe = MethodType(dummyMethod.newSyntheticValueParams(argtpes map templateArgType), restpe)
-      memberWildcardType(name, mtpe)
-    }
     def unapply(pt: Type): Option[(Name, List[Type], Type)] = pt match {
       case RefinedType(List(WildcardType), decls) =>
         decls.toList match {

@@ -1234,6 +1234,19 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
       else qual
     }
 
+    private object MemberWildcardMethodType {
+      private val dummyMethod = NoSymbol.newTermSymbol("typer$dummy") setInfo NullaryMethodType(AnyTpe)
+      private def templateArgType(argtpe: Type) = new BoundedWildcardType(TypeBounds.lower(argtpe))
+
+      /**
+       * Creates a ? { name: (? >: argtpe <: Any*)restp }
+       */
+      def apply(name: Name, argtpes: List[Type], restpe: Type): Type = {
+        val mtpe = MethodType(dummyMethod.newSyntheticValueParams(argtpes map templateArgType), restpe)
+        memberWildcardType(name, mtpe)
+      }
+    }
+    
     /** Try to apply an implicit conversion to `qual` to that it contains
      *  a method `name` which can be applied to arguments `args` with expected type `pt`.
      *  If `pt` is defined, there is a fallback to try again with pt = ?.
@@ -1245,7 +1258,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
     def adaptToArguments(qual: Tree, name: Name, args: List[Tree], pt: Type, reportAmbiguous: Boolean, saveErrors: Boolean): Tree = {
       def doAdapt(restpe: Type) =
         //util.trace("adaptToArgs "+qual+", name = "+name+", argtpes = "+(args map (_.tpe))+", pt = "+pt+" = ")
-        adaptToMember(qual, HasMethodMatching(name, args map (_.tpe), restpe), reportAmbiguous, saveErrors)
+        adaptToMember(qual, MemberWildcardMethodType(name, args map (_.tpe), restpe), reportAmbiguous, saveErrors)
 
       if (pt == WildcardType)
         doAdapt(pt)
