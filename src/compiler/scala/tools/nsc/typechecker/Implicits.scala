@@ -276,7 +276,7 @@ trait Implicits {
 
   /** An extractor for unary function types arg => res
    */
-  object Function1 {
+  private object Function1 {
     val Sym = FunctionClass(1)
     // It is tempting to think that this should be inspecting "tp baseType Sym"
     // rather than tp. See test case run/t8280 and the commit message which
