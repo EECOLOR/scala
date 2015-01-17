@@ -305,7 +305,7 @@ trait Implicits {
     if (Statistics.canEnable) Statistics.incCounter(implicitSearchCount)
 
     /** The type parameters to instantiate */
-    val undetParams = if (isView) Nil else context.outer.undetparams
+    private val undetParams = if (isView) Nil else context.outer.undetparams
     val wildPt = approximate(pt)
 
     private val runDefintions = currentRun.runDefinitions
@@ -1435,11 +1435,8 @@ trait Implicits {
 
     // check the message's syntax: should be a string literal that may contain occurrences of the string "${X}",
     // where `X` refers to a type parameter of `sym`
-    def check(sym: Symbol): Option[String] =
-      sym.getAnnotation(ImplicitNotFoundClass).flatMap(_.stringArg(0) match {
-        case Some(m) => new Message(sym, m).validate
-        case None => Some("Missing argument `msg` on implicitNotFound annotation.")
-      })
+    def check(sym: Symbol): Option[String] = 
+      sym.implicitNotFoundMsg.map(new Message(sym, _)).flatMap(_.validate)
 
     // http://dcsobral.blogspot.com/2010/01/string-interpolation-in-scala-with.html
     private val Intersobralator = """\$\{\s*([^}\s]+)\s*\}""".r
@@ -1452,12 +1449,12 @@ trait Implicits {
         })
 
       private lazy val typeParamNames: List[String] = sym.typeParams.map(_.decodedName)
-      private def typeArgsAtSym(paramTp: Type) = paramTp.baseType(sym).typeArgs
 
-      def format(paramName: Name, paramTp: Type): String = format(typeArgsAtSym(paramTp) map (_.toString))
-
-      def format(typeArgs: List[String]): String =
-        interpolate(msg, Map((typeParamNames zip typeArgs): _*)) // TODO: give access to the name and type of the implicit argument, etc?
+      def format(paramName: Name, paramTp: Type): String = {
+        val typeArgsAtSym = paramTp.baseType(sym).typeArgs
+        val typeArgs = typeArgsAtSym map (_.toString)
+        interpolate(msg, (typeParamNames zip typeArgs).toMap) // TODO: give access to the name and type of the implicit argument, etc?
+      }
 
       def validate: Option[String] = {
         val refs  = Intersobralator.findAllMatchIn(msg).map(_ group 1).toSet
