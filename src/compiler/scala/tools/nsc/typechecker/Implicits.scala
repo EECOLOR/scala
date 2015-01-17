@@ -247,7 +247,7 @@ trait Implicits {
   case class OpenImplicit(info: ImplicitInfo, pt: Type, tree: Tree)
 
   /** A sentinel indicating no implicit was found */
-  val NoImplicitInfo = new ImplicitInfo(null, NoType, NoSymbol) {
+  private val NoImplicitInfo = new ImplicitInfo(null, NoType, NoSymbol) {
     // equals used to be implemented in ImplicitInfo with an `if(this eq NoImplicitInfo)`
     // overriding the equals here seems cleaner and benchmarks show no difference in performance
     override def equals(other: Any) = other match { case that: AnyRef => that eq this  case _ => false }
