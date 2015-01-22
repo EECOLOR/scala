@@ -14,14 +14,14 @@ class Plugin(val global: Global) extends NscPlugin {
   addMacroPlugin(MacroPlugin)
 
   object MacroPlugin extends MacroPlugin {
-    override def pluginsMacroExpand(typer: Typer, expandee: Tree, mode: Mode, pt: Type): Option[Tree] = {
-      object expander extends DefMacroExpander(typer, expandee, mode, pt) {
-        override def onSuccess(expanded: Tree) = {
+    override def pluginsMacroExpand(typer: Typer, expandee: Tree, mode: Mode, pt: Type): Option[Tree] = Some {
+    
+      macroExpandWithCallbacks(typer, expandee, mode, pt, new MacroExpanderListener {
+        override def onSuccess = Some { expanded =>
           val message = s"expanded into ${expanded.toString}"
           typer.typed(q"println($message)")
         }
-      }
-      Some(expander(expandee))
+      });
     }
   }
 }

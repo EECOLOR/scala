@@ -11,13 +11,59 @@ import scala.annotation.tailrec
 import symtab.Flags._
 import scala.language.postfixOps
 
+trait Namers {
+  self: Globals with 
+  Contexts with
+  Unapplies with
+  Typers =>
+    
+  import global._
+    
+  def lockedCount:Int
+  
+  trait Namer {
+	  def standardEnterSym(tree: Tree): Context
+	  def standardEnsureCompanionObject(cdef: ClassDef, creator: ClassDef => Tree = companionModuleDef(_)): Symbol
+    
+	  private[nsc] def enterSyms(trees: List[Tree]): Namer
+    
+	  private[typechecker] def typer:Typer
+    private[typechecker] def enterSym(tree: Tree): Context
+    private[typechecker] def context: Context
+    private[typechecker] def moduleClassTypeCompleter(tree: ModuleDef):TypeCompleter
+    private[typechecker] def accessorTypeCompleter(tree: ValDef, isSetter: Boolean):TypeCompleter
+    private[typechecker] def enterValueParams(vparamss: List[List[ValDef]]): List[List[Symbol]]
+    private[typechecker] def addDerivedTrees(typer: Typer, stat: Tree): List[Tree]
+    private[typechecker] def validateParam(tree: ValDef):Unit
+    private[typechecker] def enterInScope(sym: Symbol): Symbol
+    private[typechecker] def enterIfNotThere(sym: Symbol):Unit
+    private[typechecker] def monoTypeCompleter(tree: Tree):TypeCompleter
+    private[typechecker] def enterSyntheticSym(tree: Tree): Symbol
+  }
+  
+  private[typechecker] trait TypeCompleter extends LazyType {
+    private[typechecker] def tree: Tree
+    private[typechecker] def complete(sym: Symbol):Unit
+  }
+}
+
 /** This trait declares methods to create symbols and to enter them into scopes.
  *
  *  @author Martin Odersky
  *  @version 1.0
  */
-trait Namers extends MethodSynthesis {
-  self: Analyzer =>
+trait DefaultNamers extends Namers with MethodSynthesis {
+  // self:Analyzer =>
+  self: Globals with
+  DefaultTypers with 
+  DefaultUnapplies with 
+  DefaultContexts with 
+  DefaultContextErrors with 
+  DefaultAnalyzerPlugins with 
+  SyntheticMethods with 
+  DefaultNamesDefaults with
+  DefaultMacros with
+  DefaultTypeDiagnostics => 
 
   import global._
   import definitions._
@@ -47,10 +93,10 @@ trait Namers extends MethodSynthesis {
     case _                 => false
   }
 
-  private class NormalNamer(context: Context) extends Namer(context)
-  def newNamer(context: Context): Namer = new NormalNamer(context)
+  private class NormalNamer(context: Context) extends DefaultNamer(context)
+  def newNamer(context: Context): DefaultNamer = new NormalNamer(context)
 
-  abstract class Namer(val context: Context) extends MethodSynth with NamerContextErrors { thisNamer =>
+  abstract class DefaultNamer(val context: Context) extends Namer with MethodSynth with NamerContextErrors { thisNamer =>
     // overridden by the presentation compiler
     def saveDefaultGetter(meth: Symbol, default: Symbol) { }
 
@@ -60,7 +106,7 @@ trait Namers extends MethodSynthesis {
     private lazy val innerNamer =
       if (isTemplateContext(context)) createInnerNamer() else this
 
-    def createNamer(tree: Tree): Namer = {
+    def createNamer(tree: Tree): DefaultNamer = {
       val sym = tree match {
         case ModuleDef(_, _, _) => tree.symbol.moduleClass
         case _                  => tree.symbol
@@ -1251,7 +1297,7 @@ trait Namers extends MethodSynthesis {
 
       // cache the namer used for entering the default getter symbols
       var ownerNamer: Option[Namer] = None
-      var moduleNamer: Option[(ClassDef, Namer)] = None
+      var moduleNamer: Option[(ClassDef, DefaultNamer)] = None
       var posCounter = 1
 
       // For each value parameter, create the getter method if it has a
@@ -1675,7 +1721,7 @@ trait Namers extends MethodSynthesis {
     }
   }
 
-  abstract class TypeCompleter extends LazyType {
+  abstract class DefaultTypeCompleter extends LazyType with TypeCompleter {
     val tree: Tree
   }
 
@@ -1684,7 +1730,7 @@ trait Namers extends MethodSynthesis {
     def completeImpl(sym: Symbol) = c(sym)
   }
 
-  trait LockingTypeCompleter extends TypeCompleter {
+  trait LockingTypeCompleter extends DefaultTypeCompleter {
     def completeImpl(sym: Symbol): Unit
 
     override def complete(sym: Symbol) = {
@@ -1737,7 +1783,7 @@ trait Namers extends MethodSynthesis {
   //    def foo[T, T2](a: T, x: T2)(implicit w: ComputeT2[T, T2])
   // moreover, the latter is not an encoding of the former, which hides type
   // inference of T2, so you can specify T while T2 is purely computed
-  private class DependentTypeChecker(ctx: Context)(namer: Namer) extends TypeTraverser {
+  private class DependentTypeChecker(ctx: Context)(namer: DefaultNamer) extends TypeTraverser {
     private[this] val okParams = mutable.Set[Symbol]()
     private[this] val method   = ctx.owner
 

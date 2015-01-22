@@ -14,7 +14,7 @@ import scala.reflect.internal.Mode._
 
 abstract class Erasure extends AddInterfaces
                           with scala.reflect.internal.transform.Erasure
-                          with typechecker.Analyzer
+                          with typechecker.DefaultAnalyzer
                           with TypingTransformers
                           with ast.TreeDSL
                           with TypeAdaptingTransformer
@@ -573,7 +573,7 @@ abstract class Erasure extends AddInterfaces
   }
 
   /** The modifier typer which retypes with erased types. */
-  class Eraser(_context: Context) extends Typer(_context) with TypeAdapter {
+  class Eraser(_context: Context) extends DefaultTyper(_context) with TypeAdapter {
     val typer = this.asInstanceOf[analyzer.Typer]
 
     override protected def stabilize(tree: Tree, pre: Type, mode: Mode, pt: Type): Tree = tree

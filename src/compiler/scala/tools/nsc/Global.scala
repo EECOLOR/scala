@@ -460,9 +460,12 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   // I only changed analyzer.
   //
   // factory for phases: namer, packageobjects, typer
-  lazy val analyzer = new {
+  type CorrectGlobalType = {
+    val global: Global.this.type
+  }
+  lazy val analyzer: Analyzer with CorrectGlobalType = new {
     val global: Global.this.type = Global.this
-  } with Analyzer
+  } with DefaultAnalyzer
 
   // phaseName = "patmat"
   object patmat extends {
@@ -671,9 +674,9 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
    */
 
   /** Tree checker */
-  object treeChecker extends {
+  lazy val treeChecker: TreeCheckers with CorrectGlobalType = new {
     val global: Global.this.type = Global.this
-  } with TreeCheckers
+  } with DefaultTreeCheckers
 
   /** Icode verification */
   object icodeCheckers extends {
@@ -682,7 +685,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
   object icodeChecker extends icodeCheckers.ICodeChecker()
 
-  object typer extends analyzer.Typer(
+  lazy val typer = analyzer.newTyper(
     analyzer.NoContext.make(EmptyTree, RootClass, newScope)
   )
 

@@ -395,7 +395,7 @@ abstract class Constructors extends Statics with Transform with ast.TreeDSL {
           // statements coming from the original class need retyping in the current context
           debuglog("retyping " + stat2)
 
-          val d = new specializeTypes.Duplicator(Map[Symbol, Type]())
+          val d:specializeTypes.DefaultDuplicator = new specializeTypes.DefaultDuplicator(Map[Symbol, Type]())
           d.retyped(localTyper.context1.asInstanceOf[d.Context],
                     stat2,
                     genericClazz,

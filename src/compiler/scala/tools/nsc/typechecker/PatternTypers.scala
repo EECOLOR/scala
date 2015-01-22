@@ -33,7 +33,14 @@ import Mode._
  */
 
 trait PatternTypers {
-  self: Analyzer =>
+  //self: Analyzer =>
+  self: Globals with 
+  DefaultTypers with
+  DefaultContexts with
+  DefaultContextErrors with
+  DefaultUnapplies with
+  DefaultInfer with 
+  DefaultMacros =>
 
   import global._
   import definitions._
@@ -46,7 +53,7 @@ trait PatternTypers {
   }
 
   trait PatternTyper {
-    self: Typer =>
+    self: DefaultTyper =>
 
     import TyperErrorGen._
     import infer._

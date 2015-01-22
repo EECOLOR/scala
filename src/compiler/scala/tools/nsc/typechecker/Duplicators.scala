@@ -15,7 +15,8 @@ import scala.collection.{ mutable, immutable }
  *  @author  Iulian Dragos
  *  @version 1.0
  */
-abstract class Duplicators extends Analyzer {
+abstract class Duplicators extends DefaultAnalyzer {
+
   import global._
   import definitions._
 
@@ -39,7 +40,7 @@ abstract class Duplicators extends Analyzer {
   protected def newBodyDuplicator(context: Context) = new BodyDuplicator(context)
 
   /** Return the special typer for duplicate method bodies. */
-  override def newTyper(context: Context): Typer =
+  override def newTyper(context: Context) =
     newBodyDuplicator(context)
 
   private def resetClassOwners() {
@@ -64,7 +65,7 @@ abstract class Duplicators extends Analyzer {
    *  tree, except for TypeTrees, are erased prior to type checking. TypeTrees
    *  are fixed by substituting invalid symbols for the new ones.
    */
-  class BodyDuplicator(_context: Context) extends Typer(_context) {
+  class BodyDuplicator(_context: Context) extends DefaultTyper(_context) {
 
     class FixInvalidSyms extends TypeMap {
 

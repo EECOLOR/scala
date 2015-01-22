@@ -1252,7 +1252,7 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
   }
 
   /** This duplicator additionally performs casts of expressions if that is allowed by the `casts` map. */
-  class Duplicator(casts: Map[Symbol, Type]) extends {
+  class DefaultDuplicator(casts: Map[Symbol, Type]) extends {
     val global: SpecializeTypes.this.global.type = SpecializeTypes.this.global
   } with typechecker.Duplicators {
     private val (castfrom, castto) = casts.unzip
@@ -1300,7 +1300,7 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
    * Note: The constructors phase (which also uses duplication) comes after erasure and uses the
    * post-erasure typer => we must protect it from the beforeSpecialization phase shifting.
    */
-  class SpecializationDuplicator(casts: Map[Symbol, Type]) extends Duplicator(casts) {
+  class SpecializationDuplicator(casts: Map[Symbol, Type]) extends DefaultDuplicator(casts) {
     override def retyped(context: Context, tree: Tree, oldThis: Symbol, newThis: Symbol, env: scala.collection.Map[Symbol, Type]): Tree =
       enteringSpecialize(super.retyped(context, tree, oldThis, newThis, env))
   }

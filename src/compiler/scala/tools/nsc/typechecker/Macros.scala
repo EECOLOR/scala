@@ -10,12 +10,62 @@ import scala.reflect.ClassTag
 import scala.reflect.internal.util.Statistics
 import scala.reflect.macros.util._
 import scala.util.control.ControlThrowable
-import scala.reflect.macros.runtime.{AbortMacroException, MacroRuntimes}
+import scala.reflect.macros.runtime.{AbortMacroException, MacroRuntimes, DefaultMacroRuntimes}
 import scala.reflect.runtime.{universe => ru}
 import scala.reflect.macros.compiler.DefaultMacroCompiler
 import scala.tools.reflect.FastTrack
 import scala.runtime.ScalaRunTime
 import Fingerprint._
+
+trait Macros extends MacroRuntimes {
+  self: Globals with
+  StdAttachments with
+  // needed for FastTrack
+  Analyzer =>
+    
+  import global._
+
+  def standardMacroExpand(typer: Typer, expandee: Tree, mode: Mode, pt: Type): Tree
+  def standardTypedMacroBody(typer: Typer, macroDdef: DefDef): Tree
+  def standardMacroArgs(typer: Typer, expandee: Tree): MacroArgs
+  
+  case class MacroArgs(c: MacroContext, others: List[Any])
+  
+  def macroExpandWithCallbacks(typer: Typer, expandee:Tree, mode: Mode, pt: Type, listener: MacroExpanderListener): Tree
+  
+  trait MacroExpanderListener {
+    def onSuccess: Option[Tree => Tree] = None
+    def onFallback: Option[Tree => Tree] = None
+    def onSuppressed: Option[Tree => Tree] = None
+    def onDelayed: Option[Tree => Tree] = None
+    def onSkipped: Option[Tree => Tree] = None
+    def onFailure: Option[Tree => Tree] = None
+  }
+  
+  private[scala] def computeMacroDefTypeFromMacroImplRef(macroDdef: DefDef, macroImplRef: Tree): Type
+  private[scala] def openMacros:List[MacroContext]
+  private[scala] def defaultMacroClassloader: ClassLoader
+  private[scala] def enclosingMacroPosition:Position
+  private[scala] def findMacroClassLoader(): ClassLoader
+  private[scala] def untypeMetalevel(tp: Type): Type
+  private[scala] def increaseMetalevel(pre: Type, tp: Type): Type
+  private[scala] def transformTypeTagEvidenceParams(macroImplRef: Tree, transform: (Symbol, Symbol) => Symbol): List[List[Symbol]]
+  private[scala] def loadMacroImplBinding(macroDef: Symbol): Option[MacroImplBinding]
+  private[scala] def fastTrack:FastTrack[self.type]
+  
+  private[typechecker] def macroLogVerbose(msg: => Any):Unit
+  private[typechecker] def globalSettings:Settings
+  
+  private[scala] trait MacroImplBinding {
+    private[typechecker] def isBlackbox:Boolean
+    private[scala] def isBundle:Boolean
+    private[typechecker] def signature: List[List[Fingerprint]]
+    private[typechecker] def targs: List[Tree]
+    private[typechecker] def is_??? : Boolean
+    private[scala] def className: String
+    private[scala] def methName: String
+  }
+}
 
 /**
  *  Code to deal with macros, namely with:
@@ -42,8 +92,24 @@ import Fingerprint._
  *    (Expr(elems))
  *    (TypeTag(Int))
  */
-trait Macros extends MacroRuntimes with Traces with Helpers {
-  self: Analyzer =>
+trait DefaultMacros extends Macros with DefaultMacroRuntimes with Traces with Helpers {
+  //self: Analyzer =>
+  self: Globals 
+    with DefaultContexts
+    with DefaultNamers
+    with DefaultTypers
+    with DefaultInfer
+    with DefaultImplicits
+    with EtaExpansion
+    with SyntheticMethods
+    with Unapplies
+    with DefaultNamesDefaults
+    with DefaultTypeDiagnostics
+    with DefaultContextErrors
+    with DefaultStdAttachments
+    with DefaultAnalyzerPlugins
+    // for FastTrack
+    with Analyzer =>
 
   import global._
   import definitions._
@@ -54,7 +120,7 @@ trait Macros extends MacroRuntimes with Traces with Helpers {
 
   def globalSettings = global.settings
 
-  protected def findMacroClassLoader(): ClassLoader = {
+  def findMacroClassLoader(): ClassLoader = {
     val classpath = global.classPath.asURLs
     macroLogVerbose("macro classloader: initializing from -cp: %s".format(classpath))
     ScalaClassLoader.fromURLs(classpath, self.getClass.getClassLoader)
@@ -82,7 +148,7 @@ trait Macros extends MacroRuntimes with Traces with Helpers {
    *  Includes a path to load the implementation via Java reflection,
    *  and various accounting information necessary when composing an argument list for the reflective invocation.
    */
-  case class MacroImplBinding(
+  case class DefaultMacroImplBinding(
       // Is this macro impl a bundle (a trait extending *box.Macro) or a vanilla def?
       val isBundle: Boolean,
       // Is this macro impl blackbox (i.e. having blackbox.Context in its signature)?
@@ -105,7 +171,7 @@ trait Macros extends MacroRuntimes with Traces with Helpers {
       signature: List[List[Fingerprint]],
       // type arguments part of a macro impl ref (the right-hand side of a macro definition)
       // these trees don't refer to a macro impl, so we can pickle them as is
-      targs: List[Tree]) {
+      targs: List[Tree]) extends MacroImplBinding {
     // Was this binding derived from a `def ... = macro ???` definition?
     def is_??? = {
       val Predef_??? = currentRun.runDefinitions.Predef_???
@@ -249,7 +315,7 @@ trait Macros extends MacroRuntimes with Traces with Helpers {
       val className = unpickle("className", classOf[String])
       val methodName = unpickle("methodName", classOf[String])
       val signature = unpickle("signature", classOf[List[List[Fingerprint]]])
-      MacroImplBinding(isBundle, isBlackbox, className, methodName, signature, targs)
+      DefaultMacroImplBinding(isBundle, isBlackbox, className, methodName, signature, targs)
     }
   }
 
@@ -372,7 +438,6 @@ trait Macros extends MacroRuntimes with Traces with Helpers {
 
   /** Calculate the arguments to pass to a macro implementation when expanding the provided tree.
    */
-  case class MacroArgs(c: MacroContext, others: List[Any])
   def macroArgs(typer: Typer, expandee: Tree): MacroArgs = pluginsMacroArgs(typer, expandee)
 
   /** Default implementation of `macroArgs`.
@@ -716,6 +781,24 @@ trait Macros extends MacroRuntimes with Traces with Helpers {
     expander(expandee)
   }
 
+  
+  // Temporary fix to get all tests to pass
+  def macroExpandWithCallbacks(typer: Typer, expandee:Tree, mode: Mode, pt: Type, listener: MacroExpanderListener): Tree = {
+	  new DefMacroExpander(typer, expandee, mode, pt) {
+      private def withListener(tree:Tree, 
+        callback: MacroExpanderListener => Option[Tree => Tree],
+        fallback: Tree => Tree) = callback(listener) getOrElse fallback apply tree
+      
+		  override def onSuccess(expanded: Tree) = withListener(expanded, _.onSuccess, super.onSuccess)
+      override def onFallback(expanded: Tree) = withListener(expanded, _.onFallback, super.onFallback)
+      override def onSuppressed(expandee: Tree) = withListener(expandee, _.onSuppressed, super.onSuppressed)
+      override def onDelayed(expanded: Tree) = withListener(expanded, _.onDelayed, super.onDelayed)
+      override def onSkipped(expanded: Tree) = withListener(expanded, _.onSkipped, super.onSkipped)
+      override def onFailure(expanded: Tree) = withListener(expanded, _.onFailure, super.onFailure)
+    } apply expandee
+  }
+
+  
   sealed abstract class MacroStatus(val result: Tree)
   case class Success(expanded: Tree) extends MacroStatus(expanded)
   case class Fallback(fallback: Tree) extends MacroStatus(fallback) { currentRun.reporting.seenMacroExpansionsFallingBack = true }
