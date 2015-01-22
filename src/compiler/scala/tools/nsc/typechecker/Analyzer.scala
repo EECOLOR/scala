@@ -10,27 +10,45 @@ import scala.reflect.internal.util.Statistics
 
 /** The main attribution phase.
  */
-trait Analyzer extends AnyRef
-            with Contexts
-            with Namers
-            with Typers
-            with Infer
-            with Implicits
-            with EtaExpansion
-            with SyntheticMethods
-            with Unapplies
-            with Macros
-            with NamesDefaults
-            with TypeDiagnostics
-            with ContextErrors
-            with StdAttachments
-            with AnalyzerPlugins
+trait Analyzer extends Globals
+  with Contexts
+  with Namers
+  with Typers
+  with Infer
+  with Implicits
+  with Unapplies
+  with Macros
+  with TypeDiagnostics
+  with ContextErrors
+  with StdAttachments
+  with NamesDefaults
+  with AnalyzerPlugins
 {
-  val global : Global
-  import global._
+  def namerFactory:SubComponent
+  def packageObjects:SubComponent
+  def typerFactory:SubComponent
+}
 
+trait DefaultAnalyzer extends Analyzer 
+    with DefaultContexts
+    with DefaultNamers
+    with DefaultTypers
+    with DefaultInfer
+    with DefaultImplicits
+    with EtaExpansion
+    with SyntheticMethods
+    with DefaultUnapplies
+    with DefaultMacros
+    with DefaultNamesDefaults
+    with DefaultTypeDiagnostics
+    with DefaultContextErrors
+    with DefaultStdAttachments
+    with DefaultAnalyzerPlugins {
+  
+  import global._
+  
   object namerFactory extends {
-    val global: Analyzer.this.global.type = Analyzer.this.global
+    val global: DefaultAnalyzer.this.global.type = DefaultAnalyzer.this.global
   } with SubComponent {
     val phaseName = "namer"
     val runsAfter = List[String]("parser")
@@ -46,7 +64,7 @@ trait Analyzer extends AnyRef
   }
 
   object packageObjects extends {
-    val global: Analyzer.this.global.type = Analyzer.this.global
+    val global: DefaultAnalyzer.this.global.type = DefaultAnalyzer.this.global
   } with SubComponent {
     val phaseName = "packageobjects"
     val runsAfter = List[String]()
@@ -74,7 +92,7 @@ trait Analyzer extends AnyRef
   }
 
   object typerFactory extends {
-    val global: Analyzer.this.global.type = Analyzer.this.global
+    val global: DefaultAnalyzer.this.global.type = DefaultAnalyzer.this.global
   } with SubComponent {
     import scala.reflect.internal.TypesStats.typerNanos
     val phaseName = "typer"

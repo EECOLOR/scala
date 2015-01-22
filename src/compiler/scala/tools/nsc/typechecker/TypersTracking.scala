@@ -12,7 +12,9 @@ import mutable.ListBuffer
 import Mode._
 
 trait TypersTracking {
-  self: Analyzer =>
+  //self: Analyzer =>
+  self: Globals with
+  DefaultContexts =>
 
   import global._
   import typeDebug._

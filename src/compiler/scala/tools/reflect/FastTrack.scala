@@ -2,7 +2,7 @@ package scala.tools
 package reflect
 
 import scala.reflect.reify.Taggers
-import scala.tools.nsc.typechecker.{ Analyzer, Macros }
+import scala.tools.nsc.typechecker._
 import scala.reflect.runtime.Macros.currentMirror
 import scala.reflect.api.Universe
 import scala.reflect.quasiquotes.{ Quasiquotes => QuasiquoteImpls }

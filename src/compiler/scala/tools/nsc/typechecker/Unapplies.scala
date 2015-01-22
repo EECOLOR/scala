@@ -8,12 +8,22 @@ package typechecker
 
 import symtab.Flags._
 
+trait Unapplies {
+  self: Globals =>
+    
+  import global._
+  
+  def companionModuleDef(cdef: ClassDef, parents: List[Tree] = Nil, body: List[Tree] = Nil): ModuleDef
+}
+
 /*
  *  @author  Martin Odersky
  *  @version 1.0
  */
-trait Unapplies extends ast.TreeDSL {
-  self: Analyzer =>
+trait DefaultUnapplies extends Unapplies with ast.TreeDSL {
+  //self: Analyzer =>
+  self: Globals with
+  SyntheticMethods =>
 
   import global._
   import definitions._

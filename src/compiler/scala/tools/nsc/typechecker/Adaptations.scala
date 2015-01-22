@@ -16,13 +16,16 @@ package typechecker
  *  @author  Paul Phillips
  */
 trait Adaptations {
-  self: Analyzer =>
-
+  //self: Analyzer =>
+  self: Globals with 
+  DefaultTypers with
+  DefaultContexts =>
+    
   import global._
   import definitions._
 
   trait Adaptation {
-    self: Typer =>
+    self: DefaultTyper =>
 
     import runDefinitions._
 

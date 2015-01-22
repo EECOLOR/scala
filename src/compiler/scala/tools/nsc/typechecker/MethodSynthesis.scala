@@ -15,7 +15,13 @@ import scala.language.higherKinds
  *  Namer and Typer.
  */
 trait MethodSynthesis {
-  self: Analyzer =>
+  //  self:Analyzer =>
+  self: Globals with
+  DefaultTypers with 
+  DefaultNamers with 
+  DefaultUnapplies with
+  DefaultContextErrors with
+  DefaultContexts =>
 
   import global._
   import definitions._
@@ -125,7 +131,7 @@ trait MethodSynthesis {
    *   part of the typed template.
    */
   trait MethodSynth {
-    self: Namer =>
+    self: DefaultNamer =>
 
     import NamerErrorGen._
 

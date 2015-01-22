@@ -12,7 +12,14 @@ import util.returning
 import scala.reflect.internal.util.shortClassOfInstance
 import scala.reflect.internal.util.StringOps._
 
-abstract class TreeCheckers extends Analyzer {
+trait TreeCheckers {
+  self: Globals =>
+  
+  def checkTrees():Unit
+}
+
+abstract class DefaultTreeCheckers extends TreeCheckers with DefaultAnalyzer {
+
   import global._
 
   override protected def onTreeCheckerError(pos: Position, msg: String) {
@@ -219,9 +226,9 @@ abstract class TreeCheckers extends Analyzer {
     }
   }
 
-  override def newTyper(context: Context): Typer = new TreeChecker(context)
+  override def newTyper(context: Context) = new TreeChecker(context)
 
-  class TreeChecker(context0: Context) extends Typer(context0) {
+  class TreeChecker(context0: Context) extends DefaultTyper(context0) {
     // If we don't intercept this all the synthetics get added at every phase,
     // with predictably unfortunate results.
     override protected def finishMethodSynthesis(templ: Template, clazz: Symbol, context: Context): Template = templ

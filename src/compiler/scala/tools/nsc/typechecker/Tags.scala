@@ -2,7 +2,10 @@ package scala.tools.nsc
 package typechecker
 
 trait Tags {
-  self: Analyzer =>
+  //self: Analyzer =>
+  self: Globals with 
+  DefaultTypers with
+  DefaultImplicits =>
 
   import global._
   import definitions._

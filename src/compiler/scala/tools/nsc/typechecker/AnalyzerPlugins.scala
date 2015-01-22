@@ -6,12 +6,17 @@
 package scala.tools.nsc
 package typechecker
 
-/**
- *  @author Lukas Rytz
- *  @version 1.0
- */
-trait AnalyzerPlugins { self: Analyzer =>
+trait AnalyzerPlugins {
+  self: Globals with
+  Typers with
+  Namers with
+  Macros with
+  Unapplies =>
+  
   import global._
+
+  def addAnalyzerPlugin(plugin: AnalyzerPlugin):Unit
+  def addMacroPlugin(plugin: MacroPlugin):Unit
 
   trait AnalyzerPlugin {
     /**
@@ -275,8 +280,22 @@ trait AnalyzerPlugins { self: Analyzer =>
      */
     def pluginsEnterStats(typer: Typer, stats: List[Tree]): List[Tree] = stats
   }
+}
 
+/**
+ *  @author Lukas Rytz
+ *  @version 1.0
+ */
+trait DefaultAnalyzerPlugins extends AnalyzerPlugins { 
+  //self: Analyzer =>
+  self: Globals with 
+  DefaultTypers with 
+  DefaultMacros with 
+  DefaultNamers with 
+  DefaultUnapplies with 
+  DefaultContexts =>
 
+  import global._
 
   /** A list of registered analyzer plugins */
   private var analyzerPlugins: List[AnalyzerPlugin] = Nil

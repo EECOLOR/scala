@@ -64,7 +64,10 @@ import scala.language.postfixOps
  *  like from the point of view of one of its subclasses.
  */
 trait Checkable {
-  self: Analyzer =>
+  //self: Analyzer =>
+  self: Globals with 
+  DefaultInfer with
+  DefaultContextErrors =>
 
   import global._
   import definitions._
@@ -277,7 +280,7 @@ trait Checkable {
   }
 
   trait InferCheckable {
-    self: Inferencer =>
+    self: DefaultInferencer =>
 
     def isUncheckable(P0: Type) = !isCheckable(P0)
 
