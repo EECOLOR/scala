@@ -291,7 +291,7 @@ trait DefaultAnalyzerPlugins extends AnalyzerPlugins {
   self: Globals with 
   DefaultTypers with 
   DefaultMacros with 
-  DefaultNamers with 
+  Namers with 
   DefaultUnapplies with 
   DefaultContexts =>
 

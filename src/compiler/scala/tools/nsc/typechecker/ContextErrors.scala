@@ -74,7 +74,7 @@ trait DefaultContextErrors extends ContextErrors {
   DefaultTypers with
   DefaultInfer with
   DefaultUnapplies with 
-  DefaultNamers =>
+  Namers =>
     
   import global._
   import definitions._
