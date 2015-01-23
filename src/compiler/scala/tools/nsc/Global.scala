@@ -526,18 +526,18 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   } with ExplicitOuter
 
   // phaseName = "specialize"
-  object specializeTypes extends {
+  lazy val specializeTypes: SubComponent with SpecializeTypes with CorrectGlobalType = new {
     val global: Global.this.type = Global.this
     val runsAfter = List("")
     val runsRightAfter = Some("tailcalls")
-  } with SpecializeTypes
+  } with DefaultSpecializeTypes
 
   // phaseName = "erasure"
-  override object erasure extends {
+  override lazy val erasure: SubComponent with Erasure with CorrectGlobalType = new {
     val global: Global.this.type = Global.this
     val runsAfter = List("explicitouter")
     val runsRightAfter = Some("explicitouter")
-  } with Erasure
+  } with DefaultErasure
 
   // phaseName = "posterasure"
   override object postErasure extends {

@@ -931,7 +931,7 @@ trait DefaultNamers extends Namers with MethodSynthesis {
     }
 
     // owner is the class with the self type
-    def enterSelf(self: ValDef) {
+    private def enterSelf(self: ValDef) {
       val ValDef(_, name, tpt, _) = self
       if (self eq noSelfType)
         return

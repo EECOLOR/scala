@@ -12,8 +12,33 @@ import symtab._
 import Flags._
 import scala.reflect.internal.Mode._
 
-abstract class Erasure extends AddInterfaces
-                          with scala.reflect.internal.transform.Erasure
+trait Erasure extends typechecker.Typers 
+  with scala.reflect.internal.transform.Erasure
+  with typechecker.Contexts
+  with typechecker.Globals { self:
+  // required by typechecker.Typers
+  //typechecker.Globals with
+  //typechecker.Contexts
+  typechecker.ContextErrors with
+  typechecker.TypeDiagnostics with
+  typechecker.Infer with
+  // required by typechecker.Contexts
+  //typechecker.ContextErrors with
+  typechecker.Implicits with
+  typechecker.NamesDefaults =>
+
+  import global._
+
+  private [nsc] def minimizeParents(parents: List[Type]): List[Type]
+  private [nsc] def javaSig(sym0: Symbol, info: Type): Option[String]
+  private [nsc] def prepareSigMap:TypeMap  
+  
+	private [transform] def implClass(iface: Symbol): Symbol
+  private [transform] def resolveAnonymousBridgeClash(sym: Symbol, bridge: Symbol):Unit
+}
+
+abstract class DefaultErasure extends AddInterfaces 
+                          with Erasure
                           with typechecker.DefaultAnalyzer
                           with TypingTransformers
                           with ast.TreeDSL
@@ -23,8 +48,8 @@ abstract class Erasure extends AddInterfaces
   import definitions._
   import CODE._
 
-  val analyzer: typechecker.Analyzer { val global: Erasure.this.global.type } =
-    this.asInstanceOf[typechecker.Analyzer { val global: Erasure.this.global.type }]
+  val analyzer: typechecker.Analyzer { val global: DefaultErasure.this.global.type } =
+    this.asInstanceOf[typechecker.Analyzer { val global: DefaultErasure.this.global.type }]
 
   val phaseName: String = "erasure"
 
