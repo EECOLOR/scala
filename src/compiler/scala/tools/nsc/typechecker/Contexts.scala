@@ -25,6 +25,7 @@ trait Contexts {
   private[nsc] def NoContext:Context
   
   private[typechecker] def lastAccessCheckDetails:String
+  private[typechecker] def resetContexts():Unit
   
   trait ImportInfo {
 	  def qual: Tree
@@ -167,7 +168,7 @@ trait DefaultContexts extends Contexts {
   //self: Analyzer =>
   self:
   Globals with
-  DefaultImplicits with 
+  Implicits with 
   DefaultNamesDefaults with 
   DefaultContextErrors with 
   DefaultNamers =>
@@ -956,7 +957,7 @@ trait DefaultContexts extends Contexts {
 
     private def collectImplicits(syms: Scope, pre: Type, imported: Boolean = false): List[ImplicitInfo] =
       for (sym <- syms.toList if isQualifyingImplicit(sym.name, sym, pre, imported)) yield
-        new DefaultImplicitInfo(sym.name, pre, sym)
+        newImplicitInfo(sym.name, pre, sym)
 
     private def collectImplicitImports(imp: ImportInfo): List[ImplicitInfo] = {
       val qual = imp.qual
@@ -977,7 +978,7 @@ trait DefaultContexts extends Contexts {
           if (to != nme.WILDCARD) {
             for (sym <- importedAccessibleSymbol(imp, to).alternatives)
               if (isQualifyingImplicit(to, sym, pre, imported = true))
-                impls = new DefaultImplicitInfo(to, pre, sym) :: impls
+                impls = newImplicitInfo(to, pre, sym) :: impls
           }
           impls
       }

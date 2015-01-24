@@ -18,7 +18,7 @@ trait EtaExpansion {
   //self: Analyzer =>
   self: Globals with 
   DefaultTypers with
-  DefaultContexts =>
+  Contexts =>
 
   import global._
 

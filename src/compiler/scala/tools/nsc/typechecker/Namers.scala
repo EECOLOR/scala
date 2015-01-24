@@ -56,13 +56,13 @@ trait DefaultNamers extends Namers with MethodSynthesis {
   // self:Analyzer =>
   self: Globals with
   DefaultTypers with 
-  DefaultUnapplies with 
-  DefaultContexts with 
+  Unapplies with 
+  Contexts with 
   DefaultContextErrors with 
-  DefaultAnalyzerPlugins with 
+  AnalyzerPlugins with 
   SyntheticMethods with 
   DefaultNamesDefaults with
-  DefaultMacros with
+  Macros with
   DefaultTypeDiagnostics => 
 
   import global._
@@ -1832,4 +1832,11 @@ trait DefaultNamers extends Namers with MethodSynthesis {
       companionSymbolOf(original.sourceModule, ctx)
     else
       companionSymbolOf(original, ctx).moduleClass
+      
+  // In the typeCompleter (templateSig) of a case class (resp it's module),
+  // synthetic `copy` (reps `apply`, `unapply`) methods are added. To compute
+  // their signatures, the corresponding ClassDef is needed. During naming (in
+  // `enterClassDef`), the case class ClassDef is added as an attachment to the
+  // moduleClass symbol of the companion module.
+  class ClassForCaseCompanionAttachment(val caseClass: ClassDef)
 }

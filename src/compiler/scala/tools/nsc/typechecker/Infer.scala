@@ -25,6 +25,7 @@ trait Infer {
   private[scala] def freshVar(tparam: Symbol): TypeVar
   
   private[typechecker] def formalTypes(formals: List[Type], numArgs: Int, removeByName: Boolean = true, removeRepeated: Boolean = true): List[Type]
+  private[typechecker] def isFullyDefined(tp: Type): Boolean
   
   private[scala] trait Inferencer extends InferencerContextErrors {
 	  private[scala] def checkBounds(tree: Tree, pre: Type, owner: Symbol, tparams: List[Symbol], targs: List[Type], prefix: String): Boolean
@@ -49,6 +50,20 @@ trait Infer {
     private[typechecker] def isCheckable(P0: Type): Boolean
     private[typechecker] def checkKindBounds(tparams: List[Symbol], targs: List[Type], pre: Type, owner: Symbol): List[String]
     private[typechecker] def adjustTypeArgs(tparams: List[Symbol], tvars: List[TypeVar], targs: List[Type], restpe: Type = WildcardType): AdjustedTypeArgs.Result
+    private[typechecker] def checkAccessible(tree: Tree, sym: Symbol, pre: Type, site: Tree): Tree
+    private[typechecker] def checkCheckable(tree: Tree, P0: Type, X0: Type, inPattern: Boolean, canRemedy: Boolean = false):Unit
+    private[typechecker] def followApply(tp: Type): Type
+    private[typechecker] def eligibleForTupleConversion(formals: List[Type], argsCount: Int): Boolean
+    private[typechecker] def inferArgumentInstance(tree: Tree, undetparams: List[Symbol], strictPt: Type, lenientPt: Type):Unit
+    private[typechecker] def inferExprAlternative(tree: Tree, pt: Type): Tree
+    private[typechecker] def inferMethodAlternative(tree: Tree, undetparams: List[Symbol], argtpes0: List[Type], pt0: Type): Unit
+    private[typechecker] def inferMethodInstance(fn: Tree, undetparams: List[Symbol],
+                            args: List[Tree], pt0: Type): List[Symbol]
+    private[typechecker] def inferModulePattern(pat: Tree, pt: Type):Unit
+    private[typechecker] def inferPolyAlternatives(tree: Tree, argtypes: List[Type]): Unit
+    private[typechecker] def isApplicableBasedOnArity(tpe: Type, argsCount: Int, varargsStar: Boolean, tuplingAllowed: Boolean): Boolean
+    private[typechecker] def makeFullyDefined(tp: Type): Type
+    private[typechecker] def protoTypeArgs(tparams: List[Symbol], formals: List[Type], restpe: Type, pt: Type): List[Type]
     
     private[typechecker] trait AdjustedTypeArgsObject {
       private[typechecker] type Result = mutable.LinkedHashMap[Symbol, Option[Type]]
@@ -71,10 +86,10 @@ trait DefaultInfer extends Infer with Checkable {
   DefaultTypers with 
   DefaultNamers with 
   DefaultContextErrors with
-  DefaultContexts with
+  Contexts with
   DefaultTypeDiagnostics with 
   DefaultNamesDefaults with
-  DefaultMacros =>
+  Macros =>
 
   import global._
   import definitions._

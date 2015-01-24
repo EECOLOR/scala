@@ -1,11 +1,11 @@
 package scala.tools.nsc
 package typechecker
 
-trait Tags {
+private[typechecker] trait Tags {
   //self: Analyzer =>
   self: Globals with 
-  DefaultTypers with
-  DefaultImplicits =>
+  Typers with
+  Implicits =>
 
   import global._
   import definitions._

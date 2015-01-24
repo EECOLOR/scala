@@ -19,9 +19,10 @@ trait MethodSynthesis {
   self: Globals with
   DefaultTypers with 
   DefaultNamers with 
-  DefaultUnapplies with
+  Unapplies with
   DefaultContextErrors with
-  DefaultContexts =>
+  Contexts with
+  ast.TreeDSL =>
 
   import global._
   import definitions._

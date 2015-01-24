@@ -32,7 +32,7 @@ import scala.language.postfixOps
 trait SyntheticMethods extends ast.TreeDSL {
   //self: Analyzer =>
   self: Globals with 
-  DefaultContexts with
+  Contexts with
   DefaultTypers with
   MethodSynthesis =>
 

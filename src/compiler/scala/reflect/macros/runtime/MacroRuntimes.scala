@@ -16,7 +16,7 @@ trait DefaultMacroRuntimes extends MacroRuntimes with JavaReflectionRuntimes {
   //self: scala.tools.nsc.typechecker.Analyzer =>
   self: typechecker.Globals with 
   util.Traces with 
-  typechecker.DefaultAnalyzerPlugins with 
+  typechecker.AnalyzerPlugins with 
   typechecker.Macros =>
 
   import global._

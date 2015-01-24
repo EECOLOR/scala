@@ -15,11 +15,11 @@ package typechecker
  *
  *  @author  Paul Phillips
  */
-trait Adaptations {
+private[typechecker] trait Adaptations {
   //self: Analyzer =>
   self: Globals with 
   DefaultTypers with
-  DefaultContexts =>
+  Contexts =>
     
   import global._
   import definitions._

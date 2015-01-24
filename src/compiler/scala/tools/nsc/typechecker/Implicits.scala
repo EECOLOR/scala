@@ -32,6 +32,11 @@ trait Implicits {
   private[nsc] def inferImplicit(tree: Tree, pt: Type, reportAmbiguous: Boolean, isView: Boolean, context: Context, saveAmbiguousDivergent: Boolean): SearchResult
   private[nsc] def allViewsFrom(tp: Type, context: Context, tpars: List[Symbol]): List[(SearchResult, List[TypeConstraint])]
   
+  private[typechecker] def newImplicitInfo(name: Name, pre: Type, sym: Symbol):ImplicitInfo
+  private[typechecker] def resetImplicits():Unit
+  private[typechecker] def SearchFailure:SearchResult
+  private[typechecker] def inferImplicit(tree: Tree, pt: Type, reportAmbiguous: Boolean, isView: Boolean, context: Context): SearchResult
+  
   private[scala] trait OpenImplicit {
     private[scala] def info: ImplicitInfo
     private[scala] def pt: Type
@@ -66,7 +71,9 @@ trait Implicits {
       Option(o).map(o => (o.info, o.pt, o.tree))
   }
   
-  private[typechecker] trait ImplicitSearch
+  private[typechecker] trait ImplicitSearch {
+    private[typechecker] def context:Context
+  }
   
   private[typechecker] trait ImplicitNotFoundMsgObject {
     private[typechecker] def unapply(sym: Symbol): Option[(Message)]
@@ -77,7 +84,7 @@ trait Implicits {
       private[typechecker] def validate: Option[String]
     }
   }
-  private[typechecker] def ImplicitNotFoundMsg:ImplicitNotFoundMsgObject
+  private[typechecker] val ImplicitNotFoundMsg:ImplicitNotFoundMsgObject
 }
 
 /** This trait provides methods to find various kinds of implicits.
@@ -89,9 +96,9 @@ trait DefaultImplicits extends Implicits {
   //self: Analyzer =>
   self: Globals with 
   DefaultTypers with 
-  DefaultContexts with 
+  Contexts with 
   DefaultContextErrors with 
-  DefaultMacros with 
+  Macros with 
   DefaultStdAttachments with 
   DefaultTypeDiagnostics with
   DefaultNamers with
@@ -254,12 +261,15 @@ trait DefaultImplicits extends Implicits {
     override def isAmbiguousFailure = true
   }
 
+  private[typechecker] def newImplicitInfo(name: Name, pre: Type, sym: Symbol):ImplicitInfo = 
+    new DefaultImplicitInfo(name, pre, sym)
+  
   /** A class that records an available implicit
    *  @param   name   The name of the implicit
    *  @param   pre    The prefix type of the implicit
    *  @param   sym    The symbol of the implicit
    */
-  class DefaultImplicitInfo(val name: Name, val pre: Type, val sym: Symbol) extends ImplicitInfo {
+  private class DefaultImplicitInfo(val name: Name, val pre: Type, val sym: Symbol) extends ImplicitInfo {
     private var tpeCache: Type = null
     private var isCyclicOrErroneousCache: TriState = TriState.Unknown
 

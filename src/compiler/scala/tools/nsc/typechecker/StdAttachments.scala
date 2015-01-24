@@ -40,7 +40,7 @@ trait StdAttachments {
 trait DefaultStdAttachments extends StdAttachments {
   //self: Analyzer =>
   self: Globals with 
-  DefaultContexts =>
+  Contexts =>
 
   import global._
 
