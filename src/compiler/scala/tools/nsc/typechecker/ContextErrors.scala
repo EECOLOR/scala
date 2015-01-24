@@ -14,9 +14,11 @@ import scala.reflect.macros.runtime.AbortMacroException
 import scala.util.control.NonFatal
 import scala.tools.nsc.util.stackTraceString
 import scala.reflect.io.NoAbstractFile
+import scala.reflect.macros.util.Traces
 
 trait ContextErrors {
-  self: Globals =>
+  self: Globals with
+  Contexts =>
     
   import global._
   
@@ -36,6 +38,12 @@ trait ContextErrors {
       private[typechecker] def MacroImplementationNotFoundError(expandee: Tree):Nothing
       private[typechecker] def NotAMemberError(sel: Tree, qual: Tree, name: Name):Unit
       private[typechecker] def UnstableTreeError(tree: Tree):Tree
+      private[typechecker] def WrongShapeExtractorExpansion(fun: Tree):AbsTypeError
+      private[typechecker] def CaseClassConstructorError(tree: Tree, baseMessage: String):Tree
+      private[typechecker] def OverloadedUnapplyError(tree: Tree):Unit
+      private[typechecker] def TooManyArgsPatternError(fun: Tree):AbsTypeError
+      private[typechecker] def BlackboxExtractorExpansion(fun: Tree):AbsTypeError
+      private[typechecker] def UnapplyWithSingleArgError(tree: Tree):Unit
       
       private[typechecker] trait MacroExpansionExceptionObject
       private[typechecker] val MacroExpansionException:MacroExpansionExceptionObject
@@ -46,6 +54,7 @@ trait ContextErrors {
   private[scala] trait InferencerContextErrors {
     private[scala] trait InferErrorGenObject {
       private[scala] def NotWithinBoundsErrorMessage(prefix: String, targs: List[Type], tparams: List[Symbol], explaintypes: Boolean):String
+      private[typechecker] def AccessError(tree: Tree, sym: Symbol, ctx: Context, explanation: String): AbsTypeError
     }
     private[scala] val InferErrorGen:InferErrorGenObject
   }
@@ -67,14 +76,15 @@ trait ContextErrors {
 trait DefaultContextErrors extends ContextErrors {
   //self: Analyzer =>
   self: Globals with 
-  DefaultContexts with 
-  DefaultMacros with 
+  Contexts with 
+  Macros with 
   DefaultTypeDiagnostics with 
-  DefaultImplicits with
+  Implicits with
   DefaultTypers with
   DefaultInfer with
-  DefaultUnapplies with 
-  Namers =>
+  Unapplies with 
+  Namers with
+  Traces =>
     
   import global._
   import definitions._
@@ -1257,7 +1267,7 @@ trait DefaultContextErrors extends ContextErrors {
   }
 
   trait ImplicitsContextErrors {
-    self: DefaultImplicitSearch =>
+    self: ImplicitSearch =>
 
     import definitions._
 

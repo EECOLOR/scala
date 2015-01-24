@@ -54,7 +54,7 @@ trait TypeDiagnostics {
 trait DefaultTypeDiagnostics extends TypeDiagnostics {
   //self: Analyzer =>
   self: Globals with
-  DefaultContexts with
+  Contexts with
   DefaultTypers with
   DefaultNamers with
   DefaultContextErrors =>

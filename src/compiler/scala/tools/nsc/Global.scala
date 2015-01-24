@@ -23,7 +23,6 @@ import symtab.classfile.Pickler
 import plugins.Plugins
 import ast._
 import ast.parser._
-import typechecker._
 import transform.patmat.PatternMatching
 import transform._
 import backend.icode.{ ICodes, GenICode, ICodeCheckers }
@@ -139,7 +138,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   /** Fold constants */
   object constfold extends {
     val global: Global.this.type = Global.this
-  } with ConstantFolder
+  } with typechecker.ConstantFolder
 
   /** ICode generator */
   object icodes extends {
@@ -463,9 +462,9 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   type CorrectGlobalType = {
     val global: Global.this.type
   }
-  lazy val analyzer: Analyzer with CorrectGlobalType = new {
+  lazy val analyzer: typechecker.Analyzer with CorrectGlobalType = new {
     val global: Global.this.type = Global.this
-  } with DefaultAnalyzer
+  } with typechecker.DefaultAnalyzer
 
   // phaseName = "patmat"
   object patmat extends {
@@ -481,7 +480,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     val global: Global.this.type = Global.this
     val runsAfter = List("patmat")
     val runsRightAfter = None
-  } with SuperAccessors
+  } with typechecker.SuperAccessors
 
   // phaseName = "extmethods"
   object extensionMethods extends {
@@ -502,7 +501,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     val global: Global.this.type = Global.this
     val runsAfter = List("pickler")
     val runsRightAfter = None
-  } with RefChecks
+  } with typechecker.RefChecks
 
   // phaseName = "uncurry"
   override object uncurry extends {
@@ -674,9 +673,9 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
    */
 
   /** Tree checker */
-  lazy val treeChecker: TreeCheckers with CorrectGlobalType = new {
+  lazy val treeChecker: typechecker.TreeCheckers with CorrectGlobalType = new {
     val global: Global.this.type = Global.this
-  } with DefaultTreeCheckers
+  } with typechecker.DefaultTreeCheckers
 
   /** Icode verification */
   object icodeCheckers extends {

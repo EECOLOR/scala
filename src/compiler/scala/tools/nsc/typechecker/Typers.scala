@@ -81,6 +81,11 @@ trait Typers {
       private[typechecker] def apply(unit: CompilationUnit):Unit
     }
     private[typechecker] def checkUnused:checkUnusedObject
+    
+    protected def reallyExists(sym: Symbol):Boolean
+    protected def adapt(tree: Tree, mode: Mode, pt: Type, original: Tree = EmptyTree): Tree
+    protected def typedArg(arg: Tree, mode: Mode, newmode: Mode, pt: Type): Tree
+    protected def typedType(tree: Tree, mode: Mode): Tree
   }
   
   private[scala] trait SilentResult[+T] {
@@ -122,15 +127,15 @@ trait Typers {
 trait DefaultTypers extends Typers with Adaptations with Tags with TypersTracking with PatternTypers {
   //self: Analyzer =>
   self: Globals with 
-  DefaultImplicits with  
-  DefaultContexts with 
+  Implicits with  
+  Contexts with 
   DefaultContextErrors with
-  DefaultUnapplies with
+  Unapplies with
   DefaultInfer with 
-  DefaultMacros with
+  Macros with
   DefaultTypeDiagnostics with
   DefaultNamers with 
-  DefaultAnalyzerPlugins with
+  AnalyzerPlugins with
   EtaExpansion with
   DefaultStdAttachments with
   SyntheticMethods with
@@ -219,7 +224,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
 
     private val transformed: mutable.Map[Tree, Tree] = unit.transformed
 
-    val infer = new DefaultInferencer {
+    val infer:Inferencer = new DefaultInferencer {
       def context = DefaultTyper.this.context
       // See SI-3281 re undoLog
       override def isCoercible(tp: Type, pt: Type) = undoLog undo viewExists(tp, pt)
@@ -3375,6 +3380,10 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
         } else fun
       }
 
+      object HasUnapply {
+        def unapply(tp: Type): Option[Symbol] = unapplyMember(tp).toOption
+      }
+      
       val fun = preSelectOverloaded(fun0)
 
       fun.tpe match {

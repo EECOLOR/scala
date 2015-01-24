@@ -32,15 +32,15 @@ import Mode._
  *    object Foo { def unapplySeq(x: Any): Option[(Int, Int, Seq[Int])] }
  */
 
-trait PatternTypers {
+private[typechecker] trait PatternTypers {
   //self: Analyzer =>
   self: Globals with 
   DefaultTypers with
-  DefaultContexts with
+  Contexts with
   DefaultContextErrors with
-  DefaultUnapplies with
-  DefaultInfer with 
-  DefaultMacros =>
+  Unapplies with
+  Infer with 
+  Macros =>
 
   import global._
   import definitions._
@@ -53,7 +53,7 @@ trait PatternTypers {
   }
 
   trait PatternTyper {
-    self: DefaultTyper =>
+    self: Typer =>
 
     import TyperErrorGen._
     import infer._

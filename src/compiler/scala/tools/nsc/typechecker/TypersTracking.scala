@@ -11,10 +11,10 @@ import scala.reflect.internal.util.{ BatchSourceFile, Statistics }
 import mutable.ListBuffer
 import Mode._
 
-trait TypersTracking {
+private[typechecker] trait TypersTracking {
   //self: Analyzer =>
   self: Globals with
-  DefaultContexts =>
+  Contexts =>
 
   import global._
   import typeDebug._

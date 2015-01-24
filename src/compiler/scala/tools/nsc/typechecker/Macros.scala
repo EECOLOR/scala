@@ -55,6 +55,15 @@ trait Macros extends MacroRuntimes {
   
   private[typechecker] def macroLogVerbose(msg: => Any):Unit
   private[typechecker] def globalSettings:Settings
+  private[typechecker] def isBlackbox(macroDef: Symbol): Boolean
+  private[typechecker] def notifyUndetparamsInferred(undetNoMore: List[Symbol], inferreds: List[Type]): Unit
+  private[typechecker] def standardIsBlackbox(macroDef: Symbol): Boolean
+  private[typechecker] def standardMacroRuntime(expandee: Tree): MacroRuntime
+  private[typechecker] def hasPendingMacroExpansions:Boolean
+  private[typechecker] def macroExpand(typer: Typer, expandee: Tree, mode: Mode, pt: Type): Tree
+  private[typechecker] def macroExpandAll(typer: Typer, expandee: Tree): Tree
+  private[typechecker] def notifyUndetparamsAdded(newUndets: List[Symbol]): Unit
+  private[typechecker] def typedMacroBody(typer: Typer, macroDdef: DefDef): Tree
   
   private[scala] trait MacroImplBinding {
     private[typechecker] def isBlackbox:Boolean
@@ -95,11 +104,11 @@ trait Macros extends MacroRuntimes {
 trait DefaultMacros extends Macros with DefaultMacroRuntimes with Traces with Helpers {
   //self: Analyzer =>
   self: Globals 
-    with DefaultContexts
-    with DefaultNamers
+    with Contexts
+    with Namers
     with DefaultTypers
     with DefaultInfer
-    with DefaultImplicits
+    with Implicits
     with EtaExpansion
     with SyntheticMethods
     with Unapplies
@@ -107,7 +116,7 @@ trait DefaultMacros extends Macros with DefaultMacroRuntimes with Traces with He
     with DefaultTypeDiagnostics
     with DefaultContextErrors
     with DefaultStdAttachments
-    with DefaultAnalyzerPlugins
+    with AnalyzerPlugins
     // for FastTrack
     with Analyzer =>
 

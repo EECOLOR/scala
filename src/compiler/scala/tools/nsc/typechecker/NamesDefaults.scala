@@ -38,7 +38,7 @@ trait DefaultNamesDefaults extends NamesDefaults {
   DefaultContextErrors with 
   DefaultNamers with
   DefaultTypers with 
-  DefaultContexts with
+  Contexts with
   DefaultInfer =>
 
   import global._
