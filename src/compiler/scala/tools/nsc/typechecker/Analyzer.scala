@@ -8,27 +8,9 @@ package typechecker
 
 import scala.reflect.internal.util.Statistics
 
+
 /** The main attribution phase.
  */
-trait Analyzer extends Globals
-  with Contexts
-  with Namers
-  with Typers
-  with Infer
-  with Implicits
-  with Unapplies
-  with Macros
-  with TypeDiagnostics
-  with ContextErrors
-  with StdAttachments
-  with NamesDefaults
-  with AnalyzerPlugins
-{
-  def namerFactory:SubComponent
-  def packageObjects:SubComponent
-  def typerFactory:SubComponent
-}
-
 trait DefaultAnalyzer extends Analyzer 
     with DefaultContexts
     with DefaultNamers

@@ -32,7 +32,7 @@ class ForeignCompiler {
   private lazy val nsc: Global = {
     try {
       val command = new CompilerCommand(args.toList, settings)
-      new Global(command.settings, reporter)
+      new GlobalDefault(command.settings, reporter)
     }
     catch {
       case ex @ FatalError(msg) =>

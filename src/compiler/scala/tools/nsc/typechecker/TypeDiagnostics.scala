@@ -12,26 +12,6 @@ import scala.util.control.Exception.ultimately
 import symtab.Flags._
 import PartialFunction._
 
-trait TypeDiagnostics {
-  self: Globals =>
-
-  import global._
-
-  private[scala] def treeSymTypeMsg(tree: Tree): String
-  
-  private[nsc] def exampleTuplePattern(names: List[Name]): String
-    
-  private[typechecker] def restrictionError(pos: Position, unit: CompilationUnit, msg: String): Unit
-  private[typechecker] def abstractVarMessage(sym: Symbol): String
-  private[typechecker] def foundReqMsg(found: Type, req: Type): String
-  private[typechecker] def underlyingSymbol(member: Symbol): Symbol
-
-  trait TyperDiagnostics {
-    private[typechecker] def cyclicReferenceMessage(sym: Symbol, tree: Tree):Option[String]
-    private[typechecker] def permanentlyHiddenWarning(pos: Position, hidden: Name, defn: Symbol):Unit
-  }
-}
-
 /** An interface to enable higher configurability of diagnostic messages
  *  regarding type errors.  This is barely a beginning as error messages are
  *  distributed far and wide across the codebase.  The plan is to partition
@@ -55,8 +35,8 @@ trait DefaultTypeDiagnostics extends TypeDiagnostics {
   //self: Analyzer =>
   self: Globals with
   Contexts with
-  DefaultTypers with
-  DefaultNamers with
+  Typers with
+  Namers with
   DefaultContextErrors =>
 
   import global._
@@ -458,7 +438,7 @@ trait DefaultTypeDiagnostics extends TypeDiagnostics {
   }
 
   trait DefaultTyperDiagnostics extends TyperDiagnostics {
-    self: DefaultTyper =>
+    self: Typer =>
 
     def permanentlyHiddenWarning(pos: Position, hidden: Name, defn: Symbol) =
       context.warning(pos, "imported `%s' is permanently hidden by definition of %s".format(hidden, defn.fullLocationString))

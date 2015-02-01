@@ -36,7 +36,7 @@ import scala.tools.nsc.ast.{TreeGen => AstTreeGen}
 import scala.tools.nsc.classpath.FlatClassPath
 import scala.tools.nsc.settings.ClassPathRepresentationType
 
-class Global(var currentSettings: Settings, var reporter: Reporter)
+abstract class Global(var currentSettings: Settings, var reporter: Reporter)
     extends SymbolTable
     with CompilationUnits
     with Plugins
@@ -462,9 +462,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   type CorrectGlobalType = {
     val global: Global.this.type
   }
-  lazy val analyzer: typechecker.Analyzer with CorrectGlobalType = new {
-    val global: Global.this.type = Global.this
-  } with typechecker.DefaultAnalyzer
+  val analyzer: typechecker.Analyzer with CorrectGlobalType
 
   // phaseName = "patmat"
   object patmat extends {
@@ -525,18 +523,12 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   } with ExplicitOuter
 
   // phaseName = "specialize"
-  lazy val specializeTypes: SubComponent with SpecializeTypes with CorrectGlobalType = new {
-    val global: Global.this.type = Global.this
-    val runsAfter = List("")
-    val runsRightAfter = Some("tailcalls")
-  } with DefaultSpecializeTypes
+  val specializeTypes: SubComponent with SpecializeTypes with CorrectGlobalType
 
   // phaseName = "erasure"
-  override lazy val erasure: SubComponent with Erasure with CorrectGlobalType = new {
-    val global: Global.this.type = Global.this
-    val runsAfter = List("explicitouter")
-    val runsRightAfter = Some("explicitouter")
-  } with DefaultErasure
+  override lazy val erasure: SubComponent with Erasure with CorrectGlobalType = erasureInstance 
+    
+  val erasureInstance: SubComponent with Erasure with CorrectGlobalType
 
   // phaseName = "posterasure"
   override object postErasure extends {
@@ -673,9 +665,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
    */
 
   /** Tree checker */
-  lazy val treeChecker: typechecker.TreeCheckers with CorrectGlobalType = new {
-    val global: Global.this.type = Global.this
-  } with typechecker.DefaultTreeCheckers
+  val treeChecker: typechecker.TreeCheckers with CorrectGlobalType
 
   /** Icode verification */
   object icodeCheckers extends {
@@ -1697,5 +1687,5 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 }
 
 object Global {
-  def apply(settings: Settings, reporter: Reporter): Global = new Global(settings, reporter)
+  def apply(settings: Settings, reporter: Reporter): Global = new GlobalDefault(settings, reporter)
 }

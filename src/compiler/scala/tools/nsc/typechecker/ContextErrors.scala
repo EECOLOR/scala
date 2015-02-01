@@ -16,72 +16,15 @@ import scala.tools.nsc.util.stackTraceString
 import scala.reflect.io.NoAbstractFile
 import scala.reflect.macros.util.Traces
 
-trait ContextErrors {
-  self: Globals with
-  Contexts =>
-    
-  import global._
-  
-  trait TyperContextErrors {
-    private[nsc] trait TyperErrorGenObject {
-      private[nsc] def MissingClassTagError(tree: Tree, tp: Type):Tree
-      
-      private[typechecker] def MacroTooManyArgumentListsError(expandee: Tree):Nothing
-      private[typechecker] def MacroTooFewArgumentListsError(expandee: Tree):Nothing
-      private[typechecker] def MacroTooFewArgumentsError(expandee: Tree):Nothing
-      private[typechecker] def MacroTooManyArgumentsError(expandee: Tree):Nothing
-      private[typechecker] def MacroGeneratedTypeError(expandee: Tree, err: TypeError = null):Nothing
-      private[typechecker] def MacroFreeSymbolError(expandee: Tree, sym: FreeSymbol):Nothing
-      private[typechecker] def MacroExpansionHasInvalidTypeError(expandee: Tree, expanded: Any):Nothing
-      private[typechecker] def MacroGeneratedAbort(expandee: Tree, ex: AbortMacroException):Nothing
-      private[typechecker] def MacroGeneratedException(expandee: Tree, ex: Throwable):Nothing
-      private[typechecker] def MacroImplementationNotFoundError(expandee: Tree):Nothing
-      private[typechecker] def NotAMemberError(sel: Tree, qual: Tree, name: Name):Unit
-      private[typechecker] def UnstableTreeError(tree: Tree):Tree
-      private[typechecker] def WrongShapeExtractorExpansion(fun: Tree):AbsTypeError
-      private[typechecker] def CaseClassConstructorError(tree: Tree, baseMessage: String):Tree
-      private[typechecker] def OverloadedUnapplyError(tree: Tree):Unit
-      private[typechecker] def TooManyArgsPatternError(fun: Tree):AbsTypeError
-      private[typechecker] def BlackboxExtractorExpansion(fun: Tree):AbsTypeError
-      private[typechecker] def UnapplyWithSingleArgError(tree: Tree):Unit
-      
-      private[typechecker] trait MacroExpansionExceptionObject
-      private[typechecker] val MacroExpansionException:MacroExpansionExceptionObject
-    }
-    private[nsc] val TyperErrorGen:TyperErrorGenObject
-  }
-  
-  private[scala] trait InferencerContextErrors {
-    private[scala] trait InferErrorGenObject {
-      private[scala] def NotWithinBoundsErrorMessage(prefix: String, targs: List[Type], tparams: List[Symbol], explaintypes: Boolean):String
-      private[typechecker] def AccessError(tree: Tree, sym: Symbol, ctx: Context, explanation: String): AbsTypeError
-    }
-    private[scala] val InferErrorGen:InferErrorGenObject
-  }
-  
-  private[scala] trait AbsTypeError {
-    private[scala] def errPos: Position
-    private[scala] def errMsg: String
-  }
-  
-  private[typechecker] trait AbsAmbiguousTypeError extends AbsTypeError
-  private[typechecker] trait DivergentImplicitTypeError extends AbsTypeError {
-    private[typechecker] def withPt(pt: Type): AbsTypeError
-  }
-  
-  private[typechecker] trait ErrorUtilsObject
-  private[typechecker] def ErrorUtils:ErrorUtilsObject
-}
-
 trait DefaultContextErrors extends ContextErrors {
   //self: Analyzer =>
   self: Globals with 
   Contexts with 
   Macros with 
-  DefaultTypeDiagnostics with 
+  TypeDiagnostics with 
   Implicits with
-  DefaultTypers with
-  DefaultInfer with
+  Typers with
+  Infer with
   Unapplies with 
   Namers with
   Traces =>
@@ -222,7 +165,7 @@ trait DefaultContextErrors extends ContextErrors {
   }
 
   trait DefaultTyperContextErrors extends TyperContextErrors {
-    self: DefaultTyper =>
+    self: Typer =>
 
     import infer.setError
 
@@ -929,7 +872,7 @@ trait DefaultContextErrors extends ContextErrors {
   }
 
   trait DefaultInferencerContextErrors extends InferencerContextErrors {
-    self: DefaultInferencer =>
+    self: Inferencer =>
 
     private def applyErrorMsg(tree: Tree, msg: String, argtpes: List[Type], pt: Type) = {
       def asParams(xs: List[Any]) = xs.mkString("(", ", ", ")")
@@ -1117,10 +1060,10 @@ trait DefaultContextErrors extends ContextErrors {
     }
   }
 
-  trait NamerContextErrors {
+  trait DefaultNamerContextErrors extends NamerContextErrors {
     self: Namer =>
 
-    object NamerErrorGen {
+    object NamerErrorGen extends NamerErrorGenObject {
 
       implicit val contextNamerErrorGen = context
 

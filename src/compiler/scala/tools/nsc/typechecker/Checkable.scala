@@ -63,10 +63,10 @@ import scala.language.postfixOps
  *  like from the point of view of one of its base classes, we ask what it looks
  *  like from the point of view of one of its subclasses.
  */
-trait Checkable {
+private[typechecker] trait Checkable {
   //self: Analyzer =>
   self: Globals with 
-  DefaultInfer with
+  Infer with
   DefaultContextErrors =>
 
   import global._
@@ -280,7 +280,7 @@ trait Checkable {
   }
 
   trait InferCheckable {
-    self: DefaultInferencer =>
+    self: Inferencer =>
 
     def isUncheckable(P0: Type) = !isCheckable(P0)
 

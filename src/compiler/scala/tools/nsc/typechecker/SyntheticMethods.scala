@@ -29,11 +29,11 @@ import scala.language.postfixOps
  *  Special handling:
  *    protected def readResolve(): AnyRef
  */
-trait SyntheticMethods extends ast.TreeDSL {
+private[nsc] trait SyntheticMethods extends ast.TreeDSL {
   //self: Analyzer =>
   self: Globals with 
   Contexts with
-  DefaultTypers with
+  Typers with
   MethodSynthesis =>
 
   import global._

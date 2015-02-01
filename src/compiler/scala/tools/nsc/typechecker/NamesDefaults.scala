@@ -10,24 +10,6 @@ import symtab.Flags._
 import scala.collection.mutable
 import scala.reflect.ClassTag
 
-trait NamesDefaults {
-  self: Globals with
-  Typers =>
-  
-  import global._
-  
-  private[typechecker] trait NamedApplyInfo {
-    private[typechecker] def qual: Option[Tree]
-    private[typechecker] def targs: List[Tree]
-    private[typechecker] def vargss: List[List[Tree]]
-    private[typechecker] def blockTyper: Typer
-  }
-  private[typechecker] object NamedApplyInfo {
-    private[typechecker] def unapply(n:NamedApplyInfo):Option[(Option[Tree], List[Tree], List[List[Tree]], Typer)] =
-      Option(n).map(n => (n.qual, n.targs, n.vargss, n.blockTyper))
-  }
-}
-
 /**
  *  @author Lukas Rytz
  *  @version 1.0
@@ -36,22 +18,15 @@ trait DefaultNamesDefaults extends NamesDefaults {
   //self: Analyzer =>
   self: Globals with 
   DefaultContextErrors with 
-  DefaultNamers with
-  DefaultTypers with 
+  Namers with
+  Typers with 
   Contexts with
-  DefaultInfer =>
+  Infer =>
 
   import global._
   import definitions._
   import NamesDefaultsErrorsGen._
   import treeInfo.WildcardStarArg
-
-  // Default getters of constructors are added to the companion object in the
-  // typeCompleter of the constructor (methodSig). To compute the signature,
-  // we need the ClassDef. To create and enter the symbols into the companion
-  // object, we need the templateNamer of that module class. These two are stored
-  // as an attachment in the companion module symbol
-  class ConstructorDefaultsAttachment(val classWithDefault: ClassDef, var companionModuleClassNamer: DefaultNamer)
 
   // To attach the default getters of local (term-owned) methods to the method symbol.
   // Used in Namer.enterExistingSym: it needs to re-enter the method symbol and also

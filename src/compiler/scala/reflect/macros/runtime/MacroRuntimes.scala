@@ -5,13 +5,6 @@ import scala.reflect.internal.Flags._
 import scala.reflect.runtime.ReflectionUtils
 import scala.tools.nsc.typechecker
 
-trait MacroRuntimes {
-  self: typechecker.Macros =>
-
-  // used externally
-  type MacroRuntime = MacroArgs => Any
-}
-
 trait DefaultMacroRuntimes extends MacroRuntimes with JavaReflectionRuntimes {
   //self: scala.tools.nsc.typechecker.Analyzer =>
   self: typechecker.Globals with 
