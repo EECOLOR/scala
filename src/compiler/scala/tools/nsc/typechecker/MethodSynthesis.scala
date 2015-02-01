@@ -14,11 +14,11 @@ import scala.language.higherKinds
 /** Logic related to method synthesis which involves cooperation between
  *  Namer and Typer.
  */
-trait MethodSynthesis {
+private[typechecker] trait MethodSynthesis {
   //  self:Analyzer =>
   self: Globals with
-  DefaultTypers with 
-  DefaultNamers with 
+  Typers with 
+  Namers with 
   Unapplies with
   DefaultContextErrors with
   Contexts with
@@ -132,7 +132,7 @@ trait MethodSynthesis {
    *   part of the typed template.
    */
   trait MethodSynth {
-    self: DefaultNamer =>
+    self: Namer =>
 
     import NamerErrorGen._
 

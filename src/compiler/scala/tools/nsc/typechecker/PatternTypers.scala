@@ -35,7 +35,7 @@ import Mode._
 private[typechecker] trait PatternTypers {
   //self: Analyzer =>
   self: Globals with 
-  DefaultTypers with
+  Typers with
   Contexts with
   DefaultContextErrors with
   Unapplies with

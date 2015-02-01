@@ -18,14 +18,14 @@ package typechecker
 private[typechecker] trait Adaptations {
   //self: Analyzer =>
   self: Globals with 
-  DefaultTypers with
+  Typers with
   Contexts =>
     
   import global._
   import definitions._
 
   trait Adaptation {
-    self: DefaultTyper =>
+    self: Typer =>
 
     import runDefinitions._
 

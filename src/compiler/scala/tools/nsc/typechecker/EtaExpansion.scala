@@ -14,10 +14,10 @@ import symtab.Flags._
  *  @author  Martin Odersky
  *  @version 1.0
  */
-trait EtaExpansion { 
+private[nsc] trait EtaExpansion { 
   //self: Analyzer =>
   self: Globals with 
-  DefaultTypers with
+  Typers with
   Contexts =>
 
   import global._

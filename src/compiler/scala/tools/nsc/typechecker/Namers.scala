@@ -11,42 +11,6 @@ import scala.annotation.tailrec
 import symtab.Flags._
 import scala.language.postfixOps
 
-trait Namers {
-  self: Globals with 
-  Contexts with
-  Unapplies with
-  Typers =>
-    
-  import global._
-    
-  def lockedCount:Int
-  
-  trait Namer {
-	  def standardEnterSym(tree: Tree): Context
-	  def standardEnsureCompanionObject(cdef: ClassDef, creator: ClassDef => Tree = companionModuleDef(_)): Symbol
-    
-	  private[nsc] def enterSyms(trees: List[Tree]): Namer
-    
-	  private[typechecker] def typer:Typer
-    private[typechecker] def enterSym(tree: Tree): Context
-    private[typechecker] def context: Context
-    private[typechecker] def moduleClassTypeCompleter(tree: ModuleDef):TypeCompleter
-    private[typechecker] def accessorTypeCompleter(tree: ValDef, isSetter: Boolean):TypeCompleter
-    private[typechecker] def enterValueParams(vparamss: List[List[ValDef]]): List[List[Symbol]]
-    private[typechecker] def addDerivedTrees(typer: Typer, stat: Tree): List[Tree]
-    private[typechecker] def validateParam(tree: ValDef):Unit
-    private[typechecker] def enterInScope(sym: Symbol): Symbol
-    private[typechecker] def enterIfNotThere(sym: Symbol):Unit
-    private[typechecker] def monoTypeCompleter(tree: Tree):TypeCompleter
-    private[typechecker] def enterSyntheticSym(tree: Tree): Symbol
-  }
-  
-  private[typechecker] trait TypeCompleter extends LazyType {
-    private[typechecker] def tree: Tree
-    private[typechecker] def complete(sym: Symbol):Unit
-  }
-}
-
 /** This trait declares methods to create symbols and to enter them into scopes.
  *
  *  @author Martin Odersky
@@ -55,15 +19,15 @@ trait Namers {
 trait DefaultNamers extends Namers with MethodSynthesis {
   // self:Analyzer =>
   self: Globals with
-  DefaultTypers with 
+  Typers with 
   Unapplies with 
   Contexts with 
   DefaultContextErrors with 
   AnalyzerPlugins with 
   SyntheticMethods with 
-  DefaultNamesDefaults with
+  NamesDefaults with
   Macros with
-  DefaultTypeDiagnostics => 
+  TypeDiagnostics => 
 
   import global._
   import definitions._
@@ -96,7 +60,7 @@ trait DefaultNamers extends Namers with MethodSynthesis {
   private class NormalNamer(context: Context) extends DefaultNamer(context)
   def newNamer(context: Context): DefaultNamer = new NormalNamer(context)
 
-  abstract class DefaultNamer(val context: Context) extends Namer with MethodSynth with NamerContextErrors { thisNamer =>
+  abstract class DefaultNamer(val context: Context) extends Namer with MethodSynth with DefaultNamerContextErrors { thisNamer =>
     // overridden by the presentation compiler
     def saveDefaultGetter(meth: Symbol, default: Symbol) { }
 
@@ -1297,7 +1261,7 @@ trait DefaultNamers extends Namers with MethodSynthesis {
 
       // cache the namer used for entering the default getter symbols
       var ownerNamer: Option[Namer] = None
-      var moduleNamer: Option[(ClassDef, DefaultNamer)] = None
+      var moduleNamer: Option[(ClassDef, Namer)] = None
       var posCounter = 1
 
       // For each value parameter, create the getter method if it has a
@@ -1719,10 +1683,6 @@ trait DefaultNamers extends Namers with MethodSynthesis {
       // converted to ABSOVERRIDE before arriving here.
       checkNoConflict(ABSTRACT, OVERRIDE)
     }
-  }
-
-  abstract class DefaultTypeCompleter extends LazyType with TypeCompleter {
-    val tree: Tree
   }
 
   def mkTypeCompleter(t: Tree)(c: Symbol => Unit) = new LockingTypeCompleter with FlagAgnosticCompleter {
