@@ -53,16 +53,16 @@ trait ContextErrors {
     private[scala] def errMsg: String
   }
   
-  private[typechecker] trait AbsAmbiguousTypeError extends AbsTypeError
-  private[typechecker] trait DivergentImplicitTypeError extends AbsTypeError {
+  protected trait AbsAmbiguousTypeError extends AbsTypeError
+  protected trait DivergentImplicitTypeError extends AbsTypeError {
     private[typechecker] def withPt(pt: Type): AbsTypeError
   }
   
-  private[typechecker] trait ErrorUtilsObject
-  private[typechecker] def ErrorUtils:ErrorUtilsObject
+  protected trait ErrorUtilsObject
+  protected def ErrorUtils:ErrorUtilsObject
   
-  private[typechecker] trait NamerContextErrors {
-    private[typechecker] trait NamerErrorGenObject {
+  protected trait NamerContextErrors {
+    protected trait NamerErrorGenObject {
       private[typechecker] def BeanPropertyAnnotationFieldWithoutLetterError(tree: Tree):Unit
       private[typechecker] def BeanPropertyAnnotationPrivateFieldError(tree: Tree):Unit
       private[typechecker] def BeanPropertyAnnotationLimitationError(tree: Tree):Unit

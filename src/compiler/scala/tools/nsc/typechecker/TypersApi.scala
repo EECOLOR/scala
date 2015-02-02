@@ -15,12 +15,12 @@ trait Typers {
 
   private[tools] var lastTreeToTyper: Tree
   
-  private[typechecker] trait TypingStackObject {
+  protected trait TypingStackObject {
     private[typechecker] def printTyping(tree: Tree, s: => String):Unit
     private[typechecker] def printTyping(s: => String):Unit
   }
   
-  private[typechecker] val typingStack:TypingStackObject
+  protected val typingStack:TypingStackObject
   
   trait Typer extends TyperDiagnostics with TyperContextErrors {
     def context:Context
@@ -46,7 +46,7 @@ trait Typers {
     private[nsc] def atOwner(tree: Tree, owner: Symbol): Typer
     private[nsc] def typedPos(pos: Position)(tree: Tree):Tree
     
-    private[typechecker] def context_=(context:Context):Unit
+    protected def context_=(context:Context):Unit
     private[typechecker] def samToFunctionType(tp: Type, sam: Symbol = NoSymbol): Type
     private[typechecker] def checkFeature(pos: Position, featureTrait: Symbol, construct: => String = "", immediate: Boolean = false): Boolean
     private[typechecker] def instantiatePossiblyExpectingUnit(tree: Tree, mode: Mode, pt: Type): Tree
@@ -66,12 +66,12 @@ trait Typers {
     private[typechecker] def typedArgs(args: List[Tree], mode: Mode):List[Tree]
     private[typechecker] def typed1(tree: Tree, mode: Mode, pt: Type): Tree
     private[typechecker] def makeAccessible(tree: Tree, sym: Symbol, pre: Type, site: Tree): (Tree, Type)
-    private[typechecker] val runDefinitions: definitions.RunDefinitions
+    protected val runDefinitions: definitions.RunDefinitions
     
-    private[typechecker] trait checkUnusedObject {
+    protected trait checkUnusedObject {
       private[typechecker] def apply(unit: CompilationUnit):Unit
     }
-    private[typechecker] def checkUnused:checkUnusedObject
+    protected def checkUnused:checkUnusedObject
     
     protected def reallyExists(sym: Symbol):Boolean
     protected def adapt(tree: Tree, mode: Mode, pt: Type, original: Tree = EmptyTree): Tree

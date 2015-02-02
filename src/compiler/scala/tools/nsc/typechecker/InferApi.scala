@@ -18,10 +18,10 @@ trait Infer {
   private[scala] def solvedTypes(tvars: List[TypeVar], tparams: List[Symbol], variances: List[Variance], upper: Boolean, depth: Depth): List[Type]
   private[scala] def freshVar(tparam: Symbol): TypeVar
   
-  private[typechecker] def formalTypes(formals: List[Type], numArgs: Int, removeByName: Boolean = true, removeRepeated: Boolean = true): List[Type]
-  private[typechecker] def isFullyDefined(tp: Type): Boolean
-  private[typechecker] def skipImplicit(tp: Type):Type
-  private[typechecker] def normalize(tp: Type): Type
+  protected def formalTypes(formals: List[Type], numArgs: Int, removeByName: Boolean = true, removeRepeated: Boolean = true): List[Type]
+  protected def isFullyDefined(tp: Type): Boolean
+  protected def skipImplicit(tp: Type):Type
+  protected def normalize(tp: Type): Type
   
   private[scala] trait Inferencer extends InferencerContextErrors {
     private[scala] def checkBounds(tree: Tree, pre: Type, owner: Symbol, tparams: List[Symbol], targs: List[Type], prefix: String): Boolean
@@ -60,9 +60,9 @@ trait Infer {
     private[typechecker] def isApplicableBasedOnArity(tpe: Type, argsCount: Int, varargsStar: Boolean, tuplingAllowed: Boolean): Boolean
     private[typechecker] def makeFullyDefined(tp: Type): Type
     private[typechecker] def protoTypeArgs(tparams: List[Symbol], formals: List[Type], restpe: Type, pt: Type): List[Type]
-    private[typechecker] def context: Context
+    protected def context: Context
     
-    private[typechecker] trait AdjustedTypeArgsObject {
+    protected trait AdjustedTypeArgsObject {
       private[typechecker] type Result = mutable.LinkedHashMap[Symbol, Option[Type]]
       private[typechecker] def unapply(a:Result): Some[(List[Symbol], List[Type])]
     }

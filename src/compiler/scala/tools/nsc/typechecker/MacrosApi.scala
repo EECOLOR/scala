@@ -40,17 +40,17 @@ trait Macros extends MacroRuntimes {
   private[scala] def loadMacroImplBinding(macroDef: Symbol): Option[MacroImplBinding]
   private[scala] def fastTrack:FastTrack[self.type]
   
-  private[typechecker] def macroLogVerbose(msg: => Any):Unit
-  private[typechecker] def globalSettings:Settings
-  private[typechecker] def isBlackbox(macroDef: Symbol): Boolean
-  private[typechecker] def notifyUndetparamsInferred(undetNoMore: List[Symbol], inferreds: List[Type]): Unit
-  private[typechecker] def standardIsBlackbox(macroDef: Symbol): Boolean
-  private[typechecker] def standardMacroRuntime(expandee: Tree): MacroRuntime
-  private[typechecker] def hasPendingMacroExpansions:Boolean
-  private[typechecker] def macroExpand(typer: Typer, expandee: Tree, mode: Mode, pt: Type): Tree
-  private[typechecker] def macroExpandAll(typer: Typer, expandee: Tree): Tree
-  private[typechecker] def notifyUndetparamsAdded(newUndets: List[Symbol]): Unit
-  private[typechecker] def typedMacroBody(typer: Typer, macroDdef: DefDef): Tree
+  protected def macroLogVerbose(msg: => Any):Unit
+  protected def globalSettings:Settings
+  protected def isBlackbox(macroDef: Symbol): Boolean
+  protected def notifyUndetparamsInferred(undetNoMore: List[Symbol], inferreds: List[Type]): Unit
+  protected def standardIsBlackbox(macroDef: Symbol): Boolean
+  protected def standardMacroRuntime(expandee: Tree): MacroRuntime
+  protected def hasPendingMacroExpansions:Boolean
+  protected def macroExpand(typer: Typer, expandee: Tree, mode: Mode, pt: Type): Tree
+  protected def macroExpandAll(typer: Typer, expandee: Tree): Tree
+  protected def notifyUndetparamsAdded(newUndets: List[Symbol]): Unit
+  protected def typedMacroBody(typer: Typer, macroDdef: DefDef): Tree
   
   private[scala] trait MacroImplBinding {
     private[typechecker] def isBlackbox:Boolean

@@ -14,10 +14,10 @@ trait Implicits {
   private[nsc] def inferImplicit(tree: Tree, pt: Type, reportAmbiguous: Boolean, isView: Boolean, context: Context, saveAmbiguousDivergent: Boolean): SearchResult
   private[nsc] def allViewsFrom(tp: Type, context: Context, tpars: List[Symbol]): List[(SearchResult, List[TypeConstraint])]
   
-  private[typechecker] def newImplicitInfo(name: Name, pre: Type, sym: Symbol):ImplicitInfo
-  private[typechecker] def resetImplicits():Unit
-  private[typechecker] def SearchFailure:SearchResult
-  private[typechecker] def inferImplicit(tree: Tree, pt: Type, reportAmbiguous: Boolean, isView: Boolean, context: Context): SearchResult
+  protected def newImplicitInfo(name: Name, pre: Type, sym: Symbol):ImplicitInfo
+  protected def resetImplicits():Unit
+  protected def SearchFailure:SearchResult
+  protected def inferImplicit(tree: Tree, pt: Type, reportAmbiguous: Boolean, isView: Boolean, context: Context): SearchResult
   
   private[scala] trait OpenImplicit {
     private[scala] def info: ImplicitInfo
@@ -48,16 +48,16 @@ trait Implicits {
     private[typechecker] var useCountArg:Int
   }
   
-  private[typechecker] object OpenImplicit {
+  protected object OpenImplicit {
     private[typechecker] def unapply(o:OpenImplicit):Option[(ImplicitInfo, Type, Tree)] =
       Option(o).map(o => (o.info, o.pt, o.tree))
   }
   
-  private[typechecker] trait ImplicitSearch {
+  protected trait ImplicitSearch {
     private[typechecker] def context:Context
   }
   
-  private[typechecker] trait ImplicitNotFoundMsgObject {
+  protected trait ImplicitNotFoundMsgObject {
     private[typechecker] def unapply(sym: Symbol): Option[(Message)]
     private[typechecker] def check(sym: Symbol): Option[String] 
     

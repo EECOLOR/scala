@@ -13,9 +13,9 @@ trait Namers {
     
   def lockedCount:Int
   
-  private[typechecker] def newNamer(context: Context): Namer
-  private[typechecker] def linkedClassOfClassOf(original: Symbol, ctx: Context): Symbol
-  private[typechecker] def companionSymbolOf(original: Symbol, ctx: Context): Symbol
+  protected def newNamer(context: Context): Namer
+  protected def linkedClassOfClassOf(original: Symbol, ctx: Context): Symbol
+  protected def companionSymbolOf(original: Symbol, ctx: Context): Symbol
   
   trait Namer extends NamerContextErrors {
     def standardEnterSym(tree: Tree): Context
@@ -23,7 +23,7 @@ trait Namers {
     
     private[nsc] def enterSyms(trees: List[Tree]): Namer
     
-    private[typechecker] def typer:Typer
+    protected def typer:Typer
     private[typechecker] def enterSym(tree: Tree): Context
     private[typechecker] def context: Context
     private[typechecker] def moduleClassTypeCompleter(tree: ModuleDef):TypeCompleter
@@ -43,7 +43,7 @@ trait Namers {
     protected def setPrivateWithin(tree: MemberDef, sym: Symbol): Symbol
   }
   
-  private[typechecker] trait TypeCompleter extends LazyType {
+  protected trait TypeCompleter extends LazyType {
     private[typechecker] def tree: Tree
     private[typechecker] def complete(sym: Symbol):Unit
   }

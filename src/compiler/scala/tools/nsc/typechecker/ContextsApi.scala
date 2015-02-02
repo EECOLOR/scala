@@ -18,7 +18,7 @@ trait Contexts {
   private[nsc] def NoContext:Context
   
   private[typechecker] def lastAccessCheckDetails:String
-  private[typechecker] def resetContexts():Unit
+  protected def resetContexts():Unit
   
   trait ImportInfo {
     def qual: Tree
@@ -128,7 +128,7 @@ trait Contexts {
     protected def outerDepth:Int
   }
   
-  private[typechecker] trait ContextReporter {
+  protected trait ContextReporter {
     private[typechecker] def hasErrors:Boolean
     private[typechecker] def propagateImplicitTypeErrorsTo(target: ContextReporter):Unit
     private[typechecker] def firstError: Option[AbsTypeError]
