@@ -17,20 +17,20 @@ trait AnalyzerPlugins {
 
   private[scala] def pluginsMacroRuntime(expandee: Tree): MacroRuntime
 
-  private[typechecker] def pluginsIsBlackbox(macroDef: Symbol): Boolean
-  private[typechecker] def pluginsMacroArgs(typer: Typer, expandee: Tree): MacroArgs
-  private[typechecker] def pluginsMacroExpand(typer: Typer, expandee: Tree, mode: Mode, pt: Type): Tree
-  private[typechecker] def pluginsTypedMacroBody(typer: Typer, ddef: DefDef): Tree
-  private[typechecker] def pluginsEnsureCompanionObject(namer: Namer, cdef: ClassDef, creator: ClassDef => Tree = companionModuleDef(_)): Symbol
-  private[typechecker] def pluginsTypeSig(tpe: Type, typer: Typer, defTree: Tree, pt: Type): Type
-  private[typechecker] def pluginsEnterSym(namer: Namer, tree: Tree): Context
-  private[typechecker] def pluginsTypeSigAccessor(tpe: Type, typer: Typer, tree: ValDef, sym: Symbol): Type
-  private[typechecker] def pluginsPt(pt: Type, typer: Typer, tree: Tree, mode: Mode): Type
-  private[typechecker] def pluginsEnterStats(typer: Typer, stats: List[Tree]): List[Tree]
-  private[typechecker] def pluginsTyped(tpe: Type, typer: Typer, tree: Tree, mode: Mode, pt: Type): Type
-  private[typechecker] def pluginsTypedReturn(tpe: Type, typer: Typer, tree: Return, pt: Type): Type
-  private[typechecker] def canAdaptAnnotations(tree: Tree, typer: Typer, mode: Mode, pt: Type): Boolean
-  private[typechecker] def adaptAnnotations(tree: Tree, typer: Typer, mode: Mode, pt: Type): Tree
+  protected def pluginsIsBlackbox(macroDef: Symbol): Boolean
+  protected def pluginsMacroArgs(typer: Typer, expandee: Tree): MacroArgs
+  protected def pluginsMacroExpand(typer: Typer, expandee: Tree, mode: Mode, pt: Type): Tree
+  protected def pluginsTypedMacroBody(typer: Typer, ddef: DefDef): Tree
+  protected def pluginsEnsureCompanionObject(namer: Namer, cdef: ClassDef, creator: ClassDef => Tree = companionModuleDef(_)): Symbol
+  protected def pluginsTypeSig(tpe: Type, typer: Typer, defTree: Tree, pt: Type): Type
+  protected def pluginsEnterSym(namer: Namer, tree: Tree): Context
+  protected def pluginsTypeSigAccessor(tpe: Type, typer: Typer, tree: ValDef, sym: Symbol): Type
+  protected def pluginsPt(pt: Type, typer: Typer, tree: Tree, mode: Mode): Type
+  protected def pluginsEnterStats(typer: Typer, stats: List[Tree]): List[Tree]
+  protected def pluginsTyped(tpe: Type, typer: Typer, tree: Tree, mode: Mode, pt: Type): Type
+  protected def pluginsTypedReturn(tpe: Type, typer: Typer, tree: Return, pt: Type): Type
+  protected def canAdaptAnnotations(tree: Tree, typer: Typer, mode: Mode, pt: Type): Boolean
+  protected def adaptAnnotations(tree: Tree, typer: Typer, mode: Mode, pt: Type): Tree
   
   trait AnalyzerPlugin {
     /**

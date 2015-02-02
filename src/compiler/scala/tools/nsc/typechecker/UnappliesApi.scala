@@ -9,11 +9,11 @@ trait Unapplies {
   
   def companionModuleDef(cdef: ClassDef, parents: List[Tree] = Nil, body: List[Tree] = Nil): ModuleDef
   
-  private[typechecker] def directUnapplyMember(tp: Type): Symbol
-  private[typechecker] def factoryMeth(mods: Modifiers, name: TermName, cdef: ClassDef): DefDef
-  private[typechecker] def caseModuleDef(cdef: ClassDef): ModuleDef
-  private[typechecker] def caseModuleApplyMeth(cdef: ClassDef): DefDef
-  private[typechecker] def caseModuleUnapplyMeth(cdef: ClassDef): DefDef
-  private[typechecker] def caseClassCopyMeth(cdef: ClassDef): Option[DefDef]
-  private[typechecker] def unapplyMember(tp: Type): Symbol
+  protected def directUnapplyMember(tp: Type): Symbol
+  protected def factoryMeth(mods: Modifiers, name: TermName, cdef: ClassDef): DefDef
+  protected def caseModuleDef(cdef: ClassDef): ModuleDef
+  protected def caseModuleApplyMeth(cdef: ClassDef): DefDef
+  protected def caseModuleUnapplyMeth(cdef: ClassDef): DefDef
+  protected def caseClassCopyMeth(cdef: ClassDef): Option[DefDef]
+  protected def unapplyMember(tp: Type): Symbol
 }

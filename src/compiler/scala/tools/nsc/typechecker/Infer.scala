@@ -123,7 +123,7 @@ trait DefaultInfer extends Infer with Checkable {
 
   /** Is type fully defined, i.e. no embedded anytypes or wildcards in it?
    */
-  private[typechecker] def isFullyDefined(tp: Type): Boolean = tp match {
+  protected def isFullyDefined(tp: Type): Boolean = tp match {
     case WildcardType | BoundedWildcardType(_) | NoType => false
     case NoPrefix | ThisType(_) | ConstantType(_)       => true
     case TypeRef(pre, _, args)                          => isFullyDefined(pre) && (args forall isFullyDefined)

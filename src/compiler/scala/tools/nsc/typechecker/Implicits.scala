@@ -194,7 +194,7 @@ trait DefaultImplicits extends Implicits {
     override def isAmbiguousFailure = true
   }
 
-  private[typechecker] def newImplicitInfo(name: Name, pre: Type, sym: Symbol):ImplicitInfo = 
+  protected def newImplicitInfo(name: Name, pre: Type, sym: Symbol):ImplicitInfo = 
     new DefaultImplicitInfo(name, pre, sym)
   
   /** A class that records an available implicit
