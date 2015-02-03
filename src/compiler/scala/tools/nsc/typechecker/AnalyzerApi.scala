@@ -10,12 +10,11 @@ trait Analyzer extends Globals
   with Implicits
   with Unapplies
   with Macros
-  with TypeDiagnostics
   with ContextErrors
   with StdAttachments
   with NamesDefaults
   with AnalyzerPlugins
-{
+{  
   def namerFactory:SubComponent
   def packageObjects:SubComponent
   def typerFactory:SubComponent

@@ -37,7 +37,7 @@ class StandardCompileServer(fixPort: Int = 0) extends SocketServer(fixPort) {
 
   /** Create a new compiler instance */
   def newGlobal(settings: Settings, reporter: Reporter) =
-    new GlobalDefault(settings, reporter) {
+    new Global(settings, reporter) {
       override def inform(pos: Position, msg: String) = out.println(msg)
     }
 

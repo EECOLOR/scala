@@ -50,11 +50,9 @@ trait DefaultMacros extends Macros with DefaultMacroRuntimes with Traces with He
     with Typers
     with Infer
     with Implicits
-    with EtaExpansion
     with SyntheticMethods
     with Unapplies
     with NamesDefaults
-    with TypeDiagnostics
     with DefaultContextErrors
     with StdAttachments
     with AnalyzerPlugins

@@ -30,41 +30,55 @@ trait Implicits {
     
     private[nsc] def subst: TreeTypeSubstituter
     
+    /* Used by Implicits */
     private[typechecker] def isFailure:Boolean
-    private[typechecker] def isSuccess:Boolean
     private[typechecker] def isDivergent:Boolean
     private[typechecker] def isAmbiguousFailure:Boolean
+    
+    /* Used by Implicits and Typers */
+    private[typechecker] def isSuccess:Boolean
   }
   
   private[scala] trait ImplicitInfo {
     private[scala] def pre: Type
     private[scala] def sym: Symbol
     
-    private[typechecker] def name: Name
-    private[typechecker] def tpe: Type
+    /* Used by Implicits */
     private[typechecker] def isStablePrefix:Boolean
     private[typechecker] def isCyclicOrErroneous:Boolean
     private[typechecker] var useCountView:Int
     private[typechecker] var useCountArg:Int
+    
+    /* Used by Implicits and ContextErrors */
+    private[typechecker] def name: Name
+    private[typechecker] def tpe: Type
   }
   
+  /* Used by Contexts and Implicits */
   protected object OpenImplicit {
+    /* Used by Implicits */
     private[typechecker] def unapply(o:OpenImplicit):Option[(ImplicitInfo, Type, Tree)] =
       Option(o).map(o => (o.info, o.pt, o.tree))
   }
   
+  /* Used by Implicits and ContextErrors */
   protected trait ImplicitSearch {
+    /* Used by ContextErrors */
     private[typechecker] def context:Context
   }
   
   protected trait ImplicitNotFoundMsgObject {
+	  /* Used by ContextErrors */
     private[typechecker] def unapply(sym: Symbol): Option[(Message)]
+    /* Used by RefChecks */
     private[typechecker] def check(sym: Symbol): Option[String] 
     
+    /* Used by ContextErrors */
     private[typechecker] trait Message {
+    	/* Used by ContextErrors */
       private[typechecker] def format(paramName: Name, paramTp: Type): String
-      private[typechecker] def validate: Option[String]
     }
   }
+  /* Used by RefChecks and ContextErrors */
   private[typechecker] val ImplicitNotFoundMsg:ImplicitNotFoundMsgObject
 }

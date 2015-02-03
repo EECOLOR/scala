@@ -37,7 +37,7 @@ private[typechecker] trait PatternTypers {
   self: Globals with 
   Typers with
   Contexts with
-  DefaultContextErrors with
+  ContextErrors with
   Unapplies with
   Infer with 
   Macros =>

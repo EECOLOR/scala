@@ -28,19 +28,18 @@ import scala.util.control.Breaks._
 
 trait CommentPreservingTypers extends DefaultTypers {
   self: Globals with 
-  DefaultImplicits with  
-  DefaultContexts with 
+  Implicits with  
+  Contexts with 
   DefaultContextErrors with
-  DefaultUnapplies with
+  Unapplies with
   DefaultInfer with 
-  DefaultMacros with
-  DefaultTypeDiagnostics with
-  DefaultNamers with 
-  DefaultAnalyzerPlugins with
-  EtaExpansion with
-  DefaultStdAttachments with
+  Macros with
+  Namers with 
+  AnalyzerPlugins with
+  StdAttachments with
   SyntheticMethods with
-  DefaultNamesDefaults =>
+  NamesDefaults with
+  ast.TreeDSL =>
 
   override def resetDocComments() = {}
 }

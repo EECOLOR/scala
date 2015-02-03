@@ -4,7 +4,6 @@ package typechecker
 import scala.reflect.internal.Depth
 import scala.collection.mutable
   
-
 trait Infer {
   self: Globals with
   Contexts with 
@@ -18,9 +17,16 @@ trait Infer {
   private[scala] def solvedTypes(tvars: List[TypeVar], tparams: List[Symbol], variances: List[Variance], upper: Boolean, depth: Depth): List[Type]
   private[scala] def freshVar(tparam: Symbol): TypeVar
   
+  /* Used by NamesDefaults and Typers */
   protected def formalTypes(formals: List[Type], numArgs: Int, removeByName: Boolean = true, removeRepeated: Boolean = true): List[Type]
+  
+  /* Used by Typers and PatternTypers (Typers) */
   protected def isFullyDefined(tp: Type): Boolean
+  
+  /* Used by ContextErrors */
   protected def skipImplicit(tp: Type):Type
+  
+  /* Used by Implicits and Typers */
   protected def normalize(tp: Type): Type
   
   private[scala] trait Inferencer extends InferencerContextErrors {
@@ -32,20 +38,39 @@ trait Infer {
     
     private[nsc] def approximateAbstracts:ApproximateAbstractsObject
     
+    /* Used by ContextErrors, Macros, NamesDefaults, Typers, PatternTypers (Typers) */
     private[typechecker] def setError[T <: Tree](tree: T): T
+    
+    /* Used by ContextErrors */
     private[typechecker] def getContext:Context
+    
+    /* Used by ContextErrors and Typers */
     private[typechecker] def explainTypes(tp1: Type, tp2: Type):Unit
+    
+    /* Used by PatternTypers (Typers) */
     private[typechecker] def inferConstructorInstance(tree: Tree, undetparams: List[Symbol], pt0: Type):Unit
     private[typechecker] def inferTypedPattern(tree0: Tree, pattp: Type, pt0: Type, canRemedy: Boolean): Type
-    private[typechecker] def isApplicable(undetparams: List[Symbol], ftpe: Type, argtpes0: List[Type], pt: Type): Boolean
-    private[typechecker] def isStrictlyMoreSpecific(ftpe1: Type, ftpe2: Type, sym1: Symbol, sym2: Symbol): Boolean
-    private[typechecker] def isApplicableSafe(undetparams: List[Symbol], ftpe: Type, argtpes0: List[Type], pt: Type): Boolean
-    private[typechecker] def inferExprInstance(tree: Tree, tparams: List[Symbol], pt: Type = WildcardType, treeTp0: Type = null, keepNothings: Boolean = true, useWeaklyCompatible: Boolean = false): List[Symbol]
     private[typechecker] def isUncheckable(P0: Type):Boolean
     private[typechecker] def ensureFullyDefined(tp: Type): Type
     private[typechecker] def isCheckable(P0: Type): Boolean
-    private[typechecker] def checkKindBounds(tparams: List[Symbol], targs: List[Type], pre: Type, owner: Symbol): List[String]
+    
+    /* Used by Infer */
+    private[typechecker] def isApplicable(undetparams: List[Symbol], ftpe: Type, argtpes0: List[Type], pt: Type): Boolean
+    
+    /* Used by Implicits, Typers, PatternTypers (Typers) */
+    private[typechecker] def isApplicableSafe(undetparams: List[Symbol], ftpe: Type, argtpes0: List[Type], pt: Type): Boolean
+    
+    /* Used by Implicits */
+    private[typechecker] def isStrictlyMoreSpecific(ftpe1: Type, ftpe2: Type, sym1: Symbol, sym2: Symbol): Boolean
     private[typechecker] def adjustTypeArgs(tparams: List[Symbol], tvars: List[TypeVar], targs: List[Type], restpe: Type = WildcardType): AdjustedTypeArgs.Result
+    
+    /* Used by Macros and Typers */
+    private[typechecker] def inferExprInstance(tree: Tree, tparams: List[Symbol], pt: Type = WildcardType, treeTp0: Type = null, keepNothings: Boolean = true, useWeaklyCompatible: Boolean = false): List[Symbol]
+    
+    /* Used by RefChecks */
+    private[typechecker] def checkKindBounds(tparams: List[Symbol], targs: List[Type], pre: Type, owner: Symbol): List[String]
+    
+    /* Used by Typers */
     private[typechecker] def checkAccessible(tree: Tree, sym: Symbol, pre: Type, site: Tree): Tree
     private[typechecker] def checkCheckable(tree: Tree, P0: Type, X0: Type, inPattern: Boolean, canRemedy: Boolean = false):Unit
     private[typechecker] def followApply(tp: Type): Type
@@ -54,18 +79,22 @@ trait Infer {
     private[typechecker] def inferExprAlternative(tree: Tree, pt: Type): Tree
     private[typechecker] def inferMethodAlternative(tree: Tree, undetparams: List[Symbol], argtpes0: List[Type], pt0: Type): Unit
     private[typechecker] def inferMethodInstance(fn: Tree, undetparams: List[Symbol],
-                            args: List[Tree], pt0: Type): List[Symbol]
-    private[typechecker] def inferModulePattern(pat: Tree, pt: Type):Unit
-    private[typechecker] def inferPolyAlternatives(tree: Tree, argtypes: List[Type]): Unit
-    private[typechecker] def isApplicableBasedOnArity(tpe: Type, argsCount: Int, varargsStar: Boolean, tuplingAllowed: Boolean): Boolean
-    private[typechecker] def makeFullyDefined(tp: Type): Type
-    private[typechecker] def protoTypeArgs(tparams: List[Symbol], formals: List[Type], restpe: Type, pt: Type): List[Type]
+    		args: List[Tree], pt0: Type): List[Symbol]
+		private[typechecker] def inferModulePattern(pat: Tree, pt: Type):Unit
+		private[typechecker] def inferPolyAlternatives(tree: Tree, argtypes: List[Type]): Unit
+		private[typechecker] def isApplicableBasedOnArity(tpe: Type, argsCount: Int, varargsStar: Boolean, tuplingAllowed: Boolean): Boolean
+		private[typechecker] def makeFullyDefined(tp: Type): Type
+		private[typechecker] def protoTypeArgs(tparams: List[Symbol], formals: List[Type], restpe: Type, pt: Type): List[Type]
+    
+    /* Used by ContextErrors */
     protected def context: Context
     
     protected trait AdjustedTypeArgsObject {
       private[typechecker] type Result = mutable.LinkedHashMap[Symbol, Option[Type]]
+      /* Used by Implicits */
       private[typechecker] def unapply(a:Result): Some[(List[Symbol], List[Type])]
     }
+		/* Used by Implicits */
     private[typechecker] val AdjustedTypeArgs:AdjustedTypeArgsObject
     
   }

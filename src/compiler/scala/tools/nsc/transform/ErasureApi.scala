@@ -9,7 +9,6 @@ trait Erasure extends typechecker.Typers
   //typechecker.Globals with
   //typechecker.Contexts
   typechecker.ContextErrors with
-  typechecker.TypeDiagnostics with
   typechecker.Infer with
   // required by typechecker.Contexts
   //typechecker.ContextErrors with

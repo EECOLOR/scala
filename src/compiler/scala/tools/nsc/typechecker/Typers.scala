@@ -26,22 +26,21 @@ import Mode._
  *  @author  Martin Odersky
  *  @version 1.0
  */
-trait DefaultTypers extends Typers with Adaptations with Tags with TypersTracking with PatternTypers {
+trait DefaultTypers extends Typers with Adaptations with Tags with TypersTracking with PatternTypers with TypeDiagnostics with EtaExpansion {
   //self: Analyzer =>
   self: Globals with 
   Implicits with  
   Contexts with 
-  DefaultContextErrors with
+  DefaultContextErrors with /* Required because we extend DefaultTyperContextErrors */
   Unapplies with
   DefaultInfer with /* Required because we are creating an instance of DefaultInferencer */
   Macros with
-  DefaultTypeDiagnostics with /* Required because we extend DefaultTyperDiagnostics */
   Namers with 
   AnalyzerPlugins with
-  EtaExpansion with
   StdAttachments with
   SyntheticMethods with
-  NamesDefaults =>
+  NamesDefaults with 
+  ast.TreeDSL =>
 
   import global._
   import definitions._
@@ -117,7 +116,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
   private final val InterpolatorCodeRegex  = """\$\{.*?\}""".r
   private final val InterpolatorIdentRegex = """\$[$\w]+""".r // note that \w doesn't include $
 
-  abstract class DefaultTyper(context0: Context) extends Typer with DefaultTyperDiagnostics with Adaptation with Tag with PatternTyper with DefaultTyperContextErrors with TyperDiagnostics {
+  abstract class DefaultTyper(context0: Context) extends Typer with DefaultTyperDiagnostics with Adaptation with Tag with PatternTyper with DefaultTyperContextErrors {
     import context0.unit
     import typeDebug.{ ptTree, ptBlock, ptLine, inGreen, inRed }
     import TyperErrorGen._

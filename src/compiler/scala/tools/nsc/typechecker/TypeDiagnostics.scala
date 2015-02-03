@@ -31,7 +31,7 @@ import PartialFunction._
  *  @author Paul Phillips
  *  @version 1.0
  */
-trait DefaultTypeDiagnostics extends TypeDiagnostics {
+private[typechecker] trait TypeDiagnostics {
   //self: Analyzer =>
   self: Globals with
   Contexts with
@@ -437,7 +437,7 @@ trait DefaultTypeDiagnostics extends TypeDiagnostics {
     }
   }
 
-  trait DefaultTyperDiagnostics extends TyperDiagnostics {
+  trait DefaultTyperDiagnostics {
     self: Typer =>
 
     def permanentlyHiddenWarning(pos: Position, hidden: Name, defn: Symbol) =

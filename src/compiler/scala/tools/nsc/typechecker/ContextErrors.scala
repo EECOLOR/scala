@@ -21,7 +21,6 @@ trait DefaultContextErrors extends ContextErrors {
   self: Globals with 
   Contexts with 
   Macros with 
-  TypeDiagnostics with 
   Implicits with
   Typers with
   Infer with
@@ -96,7 +95,7 @@ trait DefaultContextErrors extends ContextErrors {
   case class PosAndMsgTypeError(errPos: Position, errMsg: String)
     extends AbsTypeError
 
-  object ErrorUtils extends ErrorUtilsObject {
+  object ErrorUtils {
     def issueNormalTypeError(tree: Tree, msg: String)(implicit context: Context) {
       issueTypeError(NormalTypeError(tree, msg))
     }
@@ -755,9 +754,6 @@ trait DefaultContextErrors extends ContextErrors {
       def MacroTooManyArgumentListsError(expandee: Tree, fun: Symbol) = {
         NormalTypeError(expandee, "too many argument lists for " + fun)
       }
-
-
-      case object MacroExpansionException extends Exception with scala.util.control.ControlThrowable with MacroExpansionExceptionObject
 
       protected def macroExpansionError(expandee: Tree, msg: String, pos: Position = NoPosition) = {
         def msgForLog = if (msg != null && (msg contains "exception during macro expansion")) msg.split(EOL).drop(1).headOption.getOrElse("?") else msg

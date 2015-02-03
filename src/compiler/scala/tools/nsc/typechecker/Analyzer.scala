@@ -17,15 +17,14 @@ trait DefaultAnalyzer extends Analyzer
     with DefaultTypers
     with DefaultInfer
     with DefaultImplicits
-    with EtaExpansion
-    with SyntheticMethods
+    with DefaultSyntheticMethods
     with DefaultUnapplies
     with DefaultMacros
     with DefaultNamesDefaults
-    with DefaultTypeDiagnostics
     with DefaultContextErrors
     with DefaultStdAttachments
-    with DefaultAnalyzerPlugins {
+    with DefaultAnalyzerPlugins
+    with ast.TreeDSL {
   
   import global._
   

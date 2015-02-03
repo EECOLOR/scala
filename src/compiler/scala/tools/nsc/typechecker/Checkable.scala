@@ -67,7 +67,7 @@ private[typechecker] trait Checkable {
   //self: Analyzer =>
   self: Globals with 
   Infer with
-  DefaultContextErrors =>
+  ContextErrors =>
 
   import global._
   import definitions._

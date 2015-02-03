@@ -33,7 +33,6 @@ trait DefaultImplicits extends Implicits {
   DefaultContextErrors with 
   Macros with 
   StdAttachments with
-  DefaultTypeDiagnostics with /* from DefaultTypers */
   Namers with
   Infer =>
 

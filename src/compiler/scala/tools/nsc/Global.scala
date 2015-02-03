@@ -36,7 +36,7 @@ import scala.tools.nsc.ast.{TreeGen => AstTreeGen}
 import scala.tools.nsc.classpath.FlatClassPath
 import scala.tools.nsc.settings.ClassPathRepresentationType
 
-abstract class Global(var currentSettings: Settings, var reporter: Reporter)
+class Global(var currentSettings: Settings, var reporter: Reporter)
     extends SymbolTable
     with CompilationUnits
     with Plugins
@@ -462,7 +462,8 @@ abstract class Global(var currentSettings: Settings, var reporter: Reporter)
   type CorrectGlobalType = {
     val global: Global.this.type
   }
-  val analyzer: typechecker.Analyzer with CorrectGlobalType
+  lazy val analyzer: typechecker.Analyzer with CorrectGlobalType = 
+    GlobalImplementations.analyzerInstance(this)
 
   // phaseName = "patmat"
   object patmat extends {
@@ -523,12 +524,12 @@ abstract class Global(var currentSettings: Settings, var reporter: Reporter)
   } with ExplicitOuter
 
   // phaseName = "specialize"
-  val specializeTypes: SubComponent with SpecializeTypes with CorrectGlobalType
-
+  lazy val specializeTypes: SubComponent with SpecializeTypes with CorrectGlobalType = 
+    GlobalImplementations.specializeTypesInstance(this)
+  
   // phaseName = "erasure"
-  override lazy val erasure: SubComponent with Erasure with CorrectGlobalType = erasureInstance 
-    
-  val erasureInstance: SubComponent with Erasure with CorrectGlobalType
+  override lazy val erasure: SubComponent with Erasure with CorrectGlobalType = 
+    GlobalImplementations.erasureInstance(this)
 
   // phaseName = "posterasure"
   override object postErasure extends {
@@ -665,7 +666,8 @@ abstract class Global(var currentSettings: Settings, var reporter: Reporter)
    */
 
   /** Tree checker */
-  val treeChecker: typechecker.TreeCheckers with CorrectGlobalType
+  lazy val treeChecker: typechecker.TreeCheckers with CorrectGlobalType = 
+    GlobalImplementations.treeCheckerInstance(this)
 
   /** Icode verification */
   object icodeCheckers extends {
@@ -1687,5 +1689,5 @@ abstract class Global(var currentSettings: Settings, var reporter: Reporter)
 }
 
 object Global {
-  def apply(settings: Settings, reporter: Reporter): Global = new GlobalDefault(settings, reporter)
+  def apply(settings: Settings, reporter: Reporter): Global = new Global(settings, reporter)
 }

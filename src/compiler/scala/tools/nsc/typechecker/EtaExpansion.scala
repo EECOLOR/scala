@@ -14,7 +14,7 @@ import symtab.Flags._
  *  @author  Martin Odersky
  *  @version 1.0
  */
-private[nsc] trait EtaExpansion { 
+private[typechecker] trait EtaExpansion { 
   //self: Analyzer =>
   self: Globals with 
   Typers with
