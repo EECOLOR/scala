@@ -21,9 +21,8 @@ trait DefaultInfer extends Infer with Checkable {
   self: Globals with 
   Typers with 
   Namers with 
-  DefaultContextErrors with
+  DefaultContextErrors with /* Required because we extend DefaultInferencerContextErrors */
   Contexts with
-  TypeDiagnostics with 
   NamesDefaults with
   Macros =>
 

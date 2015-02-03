@@ -40,12 +40,17 @@ trait Macros extends MacroRuntimes {
   private[scala] def loadMacroImplBinding(macroDef: Symbol): Option[MacroImplBinding]
   private[scala] def fastTrack:FastTrack[self.type]
   
-  protected def macroLogVerbose(msg: => Any):Unit
-  protected def globalSettings:Settings
+  /* Used by Implicits and PatternTypers (Typers) */
   protected def isBlackbox(macroDef: Symbol): Boolean
+  
+  /* Used by Implicits, Infer and Typers */
   protected def notifyUndetparamsInferred(undetNoMore: List[Symbol], inferreds: List[Type]): Unit
+  
+  /* Used by AnalyzerPlugins */
   protected def standardIsBlackbox(macroDef: Symbol): Boolean
   protected def standardMacroRuntime(expandee: Tree): MacroRuntime
+  
+  /* Used by Typers */
   protected def hasPendingMacroExpansions:Boolean
   protected def macroExpand(typer: Typer, expandee: Tree, mode: Mode, pt: Type): Tree
   protected def macroExpandAll(typer: Typer, expandee: Tree): Tree
@@ -53,12 +58,14 @@ trait Macros extends MacroRuntimes {
   protected def typedMacroBody(typer: Typer, macroDdef: DefDef): Tree
   
   private[scala] trait MacroImplBinding {
-    private[typechecker] def isBlackbox:Boolean
     private[scala] def isBundle:Boolean
+    private[scala] def className: String
+    private[scala] def methName: String
+    
+    /* Used by Macros */
+    private[typechecker] def isBlackbox:Boolean
     private[typechecker] def signature: List[List[Fingerprint]]
     private[typechecker] def targs: List[Tree]
     private[typechecker] def is_??? : Boolean
-    private[scala] def className: String
-    private[scala] def methName: String
   }
 }

@@ -12,10 +12,11 @@ import symtab.Flags._
  *  @author  Martin Odersky
  *  @version 1.0
  */
-trait DefaultUnapplies extends Unapplies with ast.TreeDSL {
+trait DefaultUnapplies extends Unapplies {
   //self: Analyzer =>
   self: Globals with
-  SyntheticMethods =>
+  SyntheticMethods with 
+  ast.TreeDSL =>
 
   import global._
   import definitions._

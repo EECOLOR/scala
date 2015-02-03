@@ -15,7 +15,7 @@ import scala.reflect.{ClassTag, classTag}
 
 /** A more principled system for turning types into strings.
  */
-trait StructuredTypeStrings extends DestructureTypes {
+private[nsc] trait StructuredTypeStrings extends DestructureTypes {
   val global: Global
   import global._
 

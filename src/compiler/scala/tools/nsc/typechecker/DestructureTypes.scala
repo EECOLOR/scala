@@ -19,7 +19,7 @@ package typechecker
  *
  *  This is a work in progress.
  */
-trait DestructureTypes {
+private[typechecker] trait DestructureTypes {
   val global: Global
   import global._
   import definitions.{ NothingClass, AnyClass }

@@ -27,7 +27,8 @@ trait DefaultNamers extends Namers with MethodSynthesis {
   SyntheticMethods with 
   NamesDefaults with
   Macros with
-  TypeDiagnostics => 
+  ast.TreeDSL // Required by MethodSynthesis
+  => 
 
   import global._
   import definitions._
