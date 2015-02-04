@@ -116,8 +116,8 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
   private final val InterpolatorCodeRegex  = """\$\{.*?\}""".r
   private final val InterpolatorIdentRegex = """\$[$\w]+""".r // note that \w doesn't include $
 
-  abstract class DefaultTyper(context0: Context) extends Typer with DefaultTyperDiagnostics with Adaptation with Tag with PatternTyper with DefaultTyperContextErrors {
-    import context0.unit
+  abstract class DefaultTyper(val context: Context) extends Typer with DefaultTyperDiagnostics with Adaptation with Tag with PatternTyper with DefaultTyperContextErrors {
+    import context.unit
     import typeDebug.{ ptTree, ptBlock, ptLine, inGreen, inRed }
     import TyperErrorGen._
     val runDefinitions = currentRun.runDefinitions
@@ -244,9 +244,44 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
       namerCache
     }
 
-    var context = context0
-    def context1 = context
-
+    /*
+    private var _contextX = context0
+    def contextX = _contextX
+    def contextX_=(value:Context) = {
+      previousC :+= value + "\n" + {
+        try sys.error("")
+        catch {
+          case e:RuntimeException =>
+            val s = new java.io.StringWriter()
+            e.printStackTrace(new java.io.PrintWriter(s))
+            s.toString
+        }
+      }
+      
+     _contextX = value 
+    }
+    var previousC = Seq.empty[String]
+    private val _context = context0
+    def context = {
+    		//println("access to context")
+      if (contextX != _context) {
+        println("Diff")
+        println("previously: " + contextX)
+        println("now: " + _context)
+        
+        try sys.error("")
+        catch {
+          case e:RuntimeException => e.printStackTrace()
+        }
+        println("====")
+        previousC.foreach { println }
+      }
+      
+     _context 
+    }
+    //def context_=(value:Context) = _context = value 
+     */
+    
     def dropExistential(tp: Type): Type = tp match {
       case ExistentialType(tparams, tpe) =>
         new SubstWildcardMap(tparams).apply(tp)
@@ -1932,7 +1967,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
         body2 mapConserve { case `primaryCtor` => primaryCtor1; case stat => stat }
       }
 
-      val body3 = typedStats(body2, templ.symbol)
+      val (body3, _) = typedStats(body2, templ.symbol)
 
       if (clazz.info.firstParent.typeSymbol == AnyValClass)
         validateDerivedValueClass(clazz, body3)
@@ -2392,8 +2427,8 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
               namer.addDerivedTrees(DefaultTyper.this, vd)
             case _ => stat::Nil
             })
-        val stats2 = typedStats(stats1, context.owner)
-        val expr1 = typed(block.expr, mode &~ (FUNmode | QUALmode), pt)
+        val (stats2, newContext) = typedStats(stats1, context.owner)
+        val expr1 = newTyper(newContext).typed(block.expr, mode &~ (FUNmode | QUALmode), pt)
         treeCopy.Block(block, stats2, expr1)
           .setType(if (treeInfo.isExprSafeToInline(block)) expr1.tpe else expr1.tpe.deconst)
       } finally {
@@ -3013,7 +3048,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
 
       // need to delay rest of typedRefinement to avoid cyclic reference errors
       unit.toCheck += { () =>
-        val stats1 = typedStats(stats, NoSymbol)
+        val (stats1, _) = typedStats(stats, NoSymbol)
         // this code kicks in only after typer, so `stats` will never be filled in time
         // as a result, most of compound type trees with non-empty stats will fail to reify
         // todo. investigate whether something can be done about this
@@ -3030,7 +3065,8 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
       case _                  => log("unhandled import: "+imp+" in "+unit); imp
     }
 
-    def typedStats(stats: List[Tree], exprOwner: Symbol): List[Tree] = {
+    def typedStats(stats: List[Tree], exprOwner: Symbol): (List[Tree], Context) = {
+      var context = context1
       val inBlock = exprOwner == context.owner
       def includesTargetPos(tree: Tree) =
         tree.pos.isRange && context.unit.exists && (tree.pos includes context.unit.targetPos)
@@ -3044,6 +3080,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
               imp.symbol.initialize
               if (!imp.symbol.isError) {
                 context = context.make(imp)
+                //contextX = context
                 typedImport(imp)
               } else EmptyTree
             case _ =>
@@ -3053,11 +3090,13 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
                 stat
               } else {
                 val localTyper = if (inBlock || (stat.isDef && !stat.isInstanceOf[LabelDef])) {
-                  this
+                  //println("using local typer")
+                  newTyper(context)
+                  //this
                 } else newTyper(context.make(stat, exprOwner))
                 // XXX this creates a spurious dead code warning if an exception is thrown
                 // in a constructor, even if it is the only thing in the constructor.
-                val result = checkDead(localTyper.typedByValueExpr(stat))
+                val result = newTyper(context).checkDead(localTyper.typedByValueExpr(stat))
 
                 if (treeInfo.isSelfOrSuperConstrCall(result)) {
                   context.inConstructorSuffix = true
@@ -3162,6 +3201,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
       }
 
       val stats1 = stats mapConserve typedStat
+      val l = 
       if (phase.erasedTypes) stats1
       else {
         // As packages are open, it doesn't make sense to check double definitions here. Furthermore,
@@ -3170,6 +3210,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
           checkNoDoubleDefs
         addSynthetics(stats1)
       }
+      (l, context)
     }
 
     def typedArg(arg: Tree, mode: Mode, newmode: Mode, pt: Type): Tree = {
@@ -3769,7 +3810,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
 
     /** Compute an existential type from raw hidden symbols `syms` and type `tp`
      */
-    def packSymbols(hidden: List[Symbol], tp: Type): Type = global.packSymbols(hidden, tp, context0.owner)
+    def packSymbols(hidden: List[Symbol], tp: Type): Type = global.packSymbols(hidden, tp, context.owner)
 
     def isReferencedFrom(ctx: Context, sym: Symbol): Boolean = (
        ctx.owner.isTerm && (ctx.scope.exists { dcl => dcl.isInitialized && (dcl.info contains sym) }) || {
@@ -3893,7 +3934,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
       for (wc <- tree.whereClauses)
         if (wc.symbol == NoSymbol) { namer enterSym wc; wc.symbol setFlag EXISTENTIAL }
         else context.scope enter wc.symbol
-      val whereClauses1 = typedStats(tree.whereClauses, context.owner)
+      val (whereClauses1, _) = typedStats(tree.whereClauses, context.owner)
       for (vd @ ValDef(_, _, _, _) <- whereClauses1)
         if (vd.symbol.tpe.isVolatile)
           AbstractionFromVolatileTypeError(vd)
@@ -5021,7 +5062,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
         val pdef = treeCopy.PackageDef(pdef0, pdef0.pid, pluginsEnterStats(this, pdef0.stats))
         val pid1 = typedQualifier(pdef.pid).asInstanceOf[RefTree]
         assert(sym.moduleClass ne NoSymbol, sym)
-        val stats1 = newTyper(context.make(tree, sym.moduleClass, sym.info.decls))
+        val (stats1, _) = newTyper(context.make(tree, sym.moduleClass, sym.info.decls))
           .typedStats(pdef.stats, NoSymbol)
         treeCopy.PackageDef(tree, pid1, stats1) setType NoType
       }

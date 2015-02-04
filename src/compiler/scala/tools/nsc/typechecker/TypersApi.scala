@@ -70,7 +70,8 @@ trait Typers {
     private[scala] def resolveTypeTag(pos: Position, pre: Type, tp: Type, concrete: Boolean, allowMaterialization: Boolean = true): Tree
 
     private[nsc] def atOwner(owner: Symbol): Typer
-    private[nsc] def context1:Context
+    @deprecated("Use context", "2.11.6")
+    private[nsc] def context1:Context = context
     private[nsc] def typedCases(cases: List[CaseDef], pattp: Type, pt: Type): List[CaseDef]
     private[nsc] def typed(tree: Tree, pt: Type): Tree
     private[nsc] def typed(tree: Tree, mode: Mode): Tree
