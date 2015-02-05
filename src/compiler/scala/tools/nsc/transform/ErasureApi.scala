@@ -17,8 +17,10 @@ trait Erasure extends typechecker.Typers
 
   import global._
 
+  def needsJavaSig(tp:Type):Boolean
+  def javaSig(sym0: Symbol, info: Type): Option[String]
+  
   private [nsc] def minimizeParents(parents: List[Type]): List[Type]
-  private [nsc] def javaSig(sym0: Symbol, info: Type): Option[String]
   private [nsc] def prepareSigMap:TypeMap  
   
   private [transform] def implClass(iface: Symbol): Symbol
