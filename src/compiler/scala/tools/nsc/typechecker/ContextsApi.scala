@@ -56,14 +56,14 @@ trait Contexts {
     private[scala] def warning(pos: Position, msg: String):Unit
     
     private[tools] def initRootContext(throwing: Boolean = false, checking: Boolean = false): Unit
+    private[tools] def outer: Context
+    private[tools] def scope: Scope
+    private[tools] def enclClass: Context
+    private[tools] def prefix: Type
     
-    private[nsc] def scope: Scope
-    private[nsc] def outer: Context
-    private[nsc] def enclClass: Context
     private[nsc] def enclClassOrMethod: Context
     private[nsc] def ambiguousErrors:Boolean
     private[nsc] def isAccessible(sym: Symbol, pre: Type, superAccess: Boolean = false): Boolean
-    private[nsc] def prefix: Type
     private[nsc] var macrosEnabled:Boolean
     private[nsc] def bufferErrors:Boolean
     private[nsc] def makeImplicit(reportAmbiguousErrors: Boolean):Context
