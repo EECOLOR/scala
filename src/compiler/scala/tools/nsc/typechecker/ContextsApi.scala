@@ -42,6 +42,7 @@ trait Contexts {
     def make(tree: Tree = tree, owner: Symbol = owner,
              scope: Scope = scope, unit: CompilationUnit = unit,
              reporter: ContextReporter = this.reporter): Context
+    def lookup(name: Name, expectedOwner: Symbol):Symbol
  
     private[scala] def tree: Tree
     private[scala] def unit: CompilationUnit
@@ -113,9 +114,6 @@ trait Contexts {
     
     /* Used by Namers and Contexts */
     private[typechecker] def nextEnclosing(p: Context => Boolean): Context
-    
-    /* Used by Namers, NamesDefaults */
-    private[typechecker] def lookup(name: Name, expectedOwner: Symbol):Symbol
     
     /* used by NamesDefauls and Typers */
     private[typechecker] var namedApplyBlockInfo: Option[(Tree, NamedApplyInfo)]
