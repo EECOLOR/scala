@@ -168,7 +168,7 @@ trait DefaultContextErrors extends ContextErrors {
 
     import infer.setError
 
-    object TyperErrorGen extends TyperErrorGenObject {
+    object TyperErrorGenInternal extends TyperErrorGenObject {
       implicit val contextTyperErrorGen: Context = infer.getContext
 
       def UnstableTreeError(tree: Tree) = {
@@ -860,10 +860,10 @@ trait DefaultContextErrors extends ContextErrors {
         macroExpansionError(expandee, macroImplementationNotFoundMessage(expandee.symbol.name))
     }
 
-    protected def macroImplementationNotFoundMessage(name:Name):String
+    private[nsc] def macroImplementationNotFoundMessage(name:Name):String
     
     /** This file will be the death of me. */
-    protected def internalMacroImplementationNotFoundMessage(name: Name): String = (
+    def internalMacroImplementationNotFoundMessage(name: Name): String = (
       s"""|macro implementation not found: $name
           |(the most common reason for that is that you cannot use macro implementations in the same compilation run that defines them)""".stripMargin
     )

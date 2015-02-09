@@ -1260,16 +1260,11 @@ private[nsc] abstract class DefaultSpecializeTypes extends InfoTransform with Sp
     private object CastMap extends SubstTypeMap(castfrom.toList, castto.toList)
 
     /** Return the special typer for duplicate method bodies. */
-    override def newTyper(context: Context, settings:TyperSettings = TyperSettings.Default): Typer =
-      super.newTyper(context, settings.copy(decorations = Some(newBodyDuplicatorDecorations)))
+    override def newTyper(context: Context): Typer =
+      new BodyDuplicator(context)
     
     // it's quite weird we override it here because this is the only place Duplicator is used
-    override protected def newBodyDuplicatorDecorations(self:Typer) = {
-      val bodyDuplicator = new BodyDuplicator(self)
-      TyperDecorations(typedHook = Some(bodyDuplicator.typed))
-    } 
-    
-    class BodyDuplicator(typer:Typer) extends super.BodyDuplicator(typer) {
+    class BodyDuplicator(_context:Context) extends super.BodyDuplicator(_context) {
       override def castType(tree: Tree, pt: Type): Tree = {
         tree modifyType fixType
         // log(" tree type: " + tree.tpe)

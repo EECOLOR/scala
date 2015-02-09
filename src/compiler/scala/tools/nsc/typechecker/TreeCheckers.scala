@@ -231,15 +231,14 @@ abstract class DefaultTreeCheckers extends TreeCheckers with Typers with Context
     }
   }
 
-  override def newTyper(context: Context, settings:TyperSettings = TyperSettings.Default):Typer = 
-    super.newTyper(context, settings.copy(decorations = Some(TreeChecker)))
+  override def newTyper(context: Context):Typer = 
+    new TreeChecker(context)
 
-  def TreeChecker(self: Typer) = {
-    import self._
+  class TreeChecker(_context: Context) extends Typer(_context) {
     
     // If we don't intercept this all the synthetics get added at every phase,
     // with predictably unfortunate results.
-    def finishMethodSynthesis(`super.finishMethodSynthesis`: (Template, Symbol, Context) => Template)(templ: Template, clazz: Symbol, context: Context): Template = templ
+    override def finishMethodSynthesis(templ: Template, clazz: Symbol, context: Context): Template = templ
 
     // XXX check for tree.original on TypeTrees.
     def treesDiffer(t1: Tree, t2: Tree): Unit = {
@@ -257,25 +256,20 @@ abstract class DefaultTreeCheckers extends TreeCheckers with Typers with Context
       case EmptyTree | TypeTree() => true
       case _                      => tree.tpe eq null
     }
-    def typed(`super.typed`: (Tree, Mode, Type) => Tree)(tree: Tree, mode: Mode, pt: Type): Tree = (
+    override def typed(tree: Tree, mode: Mode, pt: Type): Tree = (
       if (passThrough(tree))
-        `super.typed`(tree, mode, pt)
+        super.typed(tree, mode, pt)
       else
-        checkedTyped(`super.typed`)(tree, mode, pt)
+        checkedTyped(tree, mode, pt)
     )
-    def checkedTyped(`super.typed`: (Tree, Mode, Type) => Tree)(tree: Tree, mode: Mode, pt: Type): Tree = {
-      val typed = wrap(tree)(`super.typed`(tree, mode, pt))
+    def checkedTyped(tree: Tree, mode: Mode, pt: Type): Tree = {
+      val typed = wrap(tree)(super.typed(tree, mode, pt))
 
       if (tree ne typed)
         treesDiffer(tree, typed)
 
       tree
     }
-
-    TyperDecorations(
-        typedHook = Some(typed), 
-        finishMethodSynthesisHook = Some(finishMethodSynthesis)
-    )
   }
   
   object precheck extends TreeStackTraverser {

@@ -55,26 +55,17 @@ trait InteractiveAnalyzer extends Analyzer
 
     import global._
   
-    override def newTyper(context: Context, settings: TyperSettings = TyperSettings.Default): Typer = 
-      super.newTyper(context, settings.copy(
-        decorations = Some(newInteractiveTyperDecorations),
-        canAdaptConstantTypeToLiteral = false,
-        canTranslateEmptyListToNil = false
-      ))
+    override def newTyper(context: Context): Typer = 
+      new InteractiveTyper(context)
       
-    private def newInteractiveTyperDecorations(typer:Typer) = {
-      val interactiveTyper = new InteractiveTyper(typer)
-      TyperDecorations(
-        missingSelectErrorTreeHook = Some(interactiveTyper.missingSelectErrorTree)
-      )
-    }
-  
     override def newNamer(context: Context): InteractiveNamer = new DefaultNamer(context) with InteractiveNamer
     
-    private class InteractiveTyper(typer:Typer) {
-      import typer._
+    private class InteractiveTyper(_context:Context) extends Typer(_context) {
     
-      def missingSelectErrorTree(`super.missingSelectErrorTree`: (Tree, Tree, Name) => Tree)(tree: Tree, qual: Tree, name: Name): Tree = tree match {
+      override def canAdaptConstantTypeToLiteral = false
+      override def canTranslateEmptyListToNil = false
+      
+      override def missingSelectErrorTree(tree: Tree, qual: Tree, name: Name): Tree = tree match {
         case Select(_, _)             => treeCopy.Select(tree, qual, name)
         case SelectFromTypeTree(_, _) => treeCopy.SelectFromTypeTree(tree, qual, name)
       }

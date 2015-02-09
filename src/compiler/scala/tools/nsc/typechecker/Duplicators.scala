@@ -40,11 +40,6 @@ abstract class Duplicators {
     newTyper(context).typed(tree)
   }
 
-  protected def newBodyDuplicatorDecorations(self:Typer) = {
-    val bodyDuplicator = new BodyDuplicator(self)
-    TyperDecorations(typedHook = Some(bodyDuplicator.typed))
-  } 
-    
   private def resetClassOwners() {
     oldClassOwner = null
     newClassOwner = null
@@ -67,8 +62,7 @@ abstract class Duplicators {
    *  tree, except for TypeTrees, are erased prior to type checking. TypeTrees
    *  are fixed by substituting invalid symbols for the new ones.
    */
-  class BodyDuplicator(self: Typer) {
-    import self._
+  class BodyDuplicator(_context: Context) extends Typer(_context) {
 
     class FixInvalidSyms extends TypeMap {
 
@@ -204,7 +198,7 @@ abstract class Duplicators {
      *  their symbols are recreated ad-hoc and their types are fixed inline, instead of letting the
      *  namer/typer handle them, or Idents that refer to them.
      */
-    def typed(`super.typed`: (Tree, Mode, Type) => Tree)(tree: Tree, mode: Mode, pt: Type): Tree = {
+    override def typed(tree: Tree, mode: Mode, pt: Type): Tree = {
       debuglog("typing " + tree + ": " + tree.tpe + ", " + tree.getClass)
       val origtreesym = tree.symbol
       if (tree.hasSymbolField && tree.symbol != NoSymbol
@@ -223,27 +217,27 @@ abstract class Duplicators {
           debuglog("invalidating block")
           invalidateAll(stats)
           invalidate(res)
-          `super.typed`(tree.clearType(), mode, pt)
+          super.typed(tree.clearType(), mode, pt)
 
         case ClassDef(_, _, _, tmpl @ Template(parents, _, stats)) =>
           // log("invalidating classdef " + tree)
           tmpl.symbol = tree.symbol.newLocalDummy(tree.pos)
           invalidateAll(stats, tree.symbol)
-          `super.typed`(tree.clearType(), mode, pt)
+          super.typed(tree.clearType(), mode, pt)
 
         case ddef @ DefDef(_, _, _, _, tpt, rhs) =>
           ddef.tpt modifyType fixType
-          `super.typed`(ddef.clearType(), mode, pt)
+          super.typed(ddef.clearType(), mode, pt)
 
         case fun: Function =>
           debuglog("Clearing the type and retyping Function: " + fun)
-          `super.typed`(fun.clearType, mode, pt)
+          super.typed(fun.clearType, mode, pt)
 
         case vdef @ ValDef(mods, name, tpt, rhs) =>
           // log("vdef fixing tpe: " + tree.tpe + " with sym: " + tree.tpe.typeSymbol + " and " + invalidSyms)
           //if (mods.hasFlag(Flags.LAZY)) vdef.symbol.resetFlag(Flags.MUTABLE) // Martin to Iulian: lazy vars can now appear because they are no longer boxed; Please check that deleting this statement is OK.
           vdef.tpt modifyType fixType
-          `super.typed`(vdef.clearType(), mode, pt)
+          super.typed(vdef.clearType(), mode, pt)
 
         case ldef @ LabelDef(name, params, rhs) =>
           // log("label def: " + ldef)
@@ -268,22 +262,22 @@ abstract class Duplicators {
           val params1 = params map newParam
           val rhs1 = (new TreeSubstituter(params map (_.symbol), params1) transform rhs) // TODO: duplicate?
 
-          `super.typed`(treeCopy.LabelDef(tree, name, params1, rhs1.clearType()), mode, pt)
+          super.typed(treeCopy.LabelDef(tree, name, params1, rhs1.clearType()), mode, pt)
 
         case Bind(name, _) =>
           // log("bind: " + tree)
           invalidate(tree)
-          `super.typed`(tree.clearType(), mode, pt)
+          super.typed(tree.clearType(), mode, pt)
 
         case Ident(_) if tree.symbol.isLabel =>
           debuglog("Ident to labeldef " + tree + " switched to ")
           tree.symbol = updateSym(tree.symbol)
-          `super.typed`(tree.clearType(), mode, pt)
+          super.typed(tree.clearType(), mode, pt)
 
         case Ident(_) if (origtreesym ne null) && origtreesym.isLazy =>
           debuglog("Ident to a lazy val " + tree + ", " + tree.symbol + " updated to " + origtreesym)
           tree.symbol = updateSym(origtreesym)
-          `super.typed`(tree.clearType(), mode, pt)
+          super.typed(tree.clearType(), mode, pt)
 
         case Select(th @ This(_), sel) if (oldClassOwner ne null) && (th.symbol == oldClassOwner) =>
           // We use the symbol name instead of the tree name because the symbol
@@ -318,7 +312,7 @@ abstract class Duplicators {
             }
             else nameSelection
           )
-          `super.typed`(atPos(tree.pos)(newTree), mode, pt)
+          super.typed(atPos(tree.pos)(newTree), mode, pt)
 
         case This(_) if (oldClassOwner ne null) && (tree.symbol == oldClassOwner) =>
 //          val tree1 = Typed(This(newClassOwner), TypeTree(fixType(tree.tpe.widen)))
@@ -332,14 +326,14 @@ abstract class Duplicators {
           debuglog("selection on this, plain: " + tree)
           tree.symbol = updateSym(tree.symbol)
           val ntree = castType(tree, pt)
-          val tree1 = `super.typed`(ntree, mode, pt)
+          val tree1 = super.typed(ntree, mode, pt)
           // log("plain this typed to: " + tree1)
           tree1
 /* no longer needed, because Super now contains a This(...)
         case Super(qual, mix) if (oldClassOwner ne null) && (tree.symbol == oldClassOwner) =>
           val tree1 = Super(qual, mix)
           log("changed " + tree + " to " + tree1)
-          `super.typed`(atPos(tree.pos)(tree1))
+          super.typed(atPos(tree.pos)(tree1))
 */
         case Match(scrut, cases) =>
           val scrut1   = typedByValueExpr(scrut)
@@ -363,7 +357,7 @@ abstract class Duplicators {
               cases
           }
 
-          `super.typed`(atPos(tree.pos)(Match(scrut, cases1)), mode, pt)
+          super.typed(atPos(tree.pos)(Match(scrut, cases1)), mode, pt)
 
         case EmptyTree =>
           // no need to do anything, in particular, don't set the type to null, EmptyTree.tpe_= asserts
@@ -376,7 +370,7 @@ abstract class Duplicators {
             tree.symbol = NoSymbol // maybe we can find a more specific member in a subclass of Any (see AnyVal members, like ==)
 
           val ntree = castType(tree, pt)
-          `super.typed`(ntree, mode, pt)
+          super.typed(ntree, mode, pt)
       }
     }
   }

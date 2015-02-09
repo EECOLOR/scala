@@ -106,10 +106,26 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
 
   case class DefaultSilentResultValue[+T](value: T) extends DefaultSilentResult[T] with SilentResultValue[T] { override def isEmpty = false }
   
-  def newTyperImplementation(context: Context, settings: TyperSettings): Typer = 
-    new NormalTyper(context, settings)
+  def newTyperImplementation(context: Context, decorations: Option[OverridableTyperMethods] = None): (TyperApi, OverridableTyperMethods) = {
+    val typer = new NormalTyper(context, decorations)
+    newTyperProxy(typer)
+  } 
   
-  private class NormalTyper(context: Context, settings: TyperSettings) extends DefaultTyper(context, settings)
+  private def overriddenMethods(typer:DefaultTyper) = 
+    OverridableTyperMethods(
+      typer.internalTyped,
+      typer.internalTyped1,
+      typer.internalFinishMethodSynthesis,
+      typer.internalAdapt,
+      typer.internalStabilize,
+      typer.internalMacroImplementationNotFoundMessage,
+      typer.internalTypedDocDef,
+      typer.internalMissingSelectErrorTree,
+      typer.internalCanAdaptConstantTypeToLiteral,
+      typer.internalCanTranslateEmptyListToNil    
+    )
+  
+  private class NormalTyper(context: Context, decorations: Option[OverridableTyperMethods]) extends DefaultTyper(context, decorations)
 
   // A transient flag to mark members of anonymous classes
   // that are turned private by typedBlock
@@ -118,62 +134,139 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
   private final val InterpolatorCodeRegex  = """\$\{.*?\}""".r
   private final val InterpolatorIdentRegex = """\$[$\w]+""".r // note that \w doesn't include $
 
-  private abstract class DefaultTyper(context0: Context, typerSettings:TyperSettings) extends Typer with DefaultTyperDiagnostics with Adaptation with Tag with PatternTyper with DefaultTyperContextErrors {
+  private def newTyperProxy(typer:DefaultTyper) = {
+    import typer._
+    val typerProxy = new TyperApi {
+        final def context: Context = contextInternal
+        final def typed(tree: Tree): Tree = typedInternal(tree)
+        final private[scala] lazy val infer: Inferencer = inferInternal
+        final private[scala] def typedType(tree: Tree): Tree = typedTypeInternal(tree)
+        final private[scala] def silent[T](op: Typer => T,
+                                     reportAmbiguousErrors: Boolean = context.ambiguousErrors,
+                                     newtree: Tree = context.tree): SilentResult[T] = silentInternal(op, reportAmbiguousErrors, newtree)
+        final private[scala] def typedTypeConstructor(tree: Tree): Tree = typedTypeConstructorInternal(tree)
+        final private[scala] def resolveClassTag(pos: Position, tp: Type, allowMaterialization: Boolean = true): Tree = resolveClassTagInternal(pos, tp, allowMaterialization)
+        final private[scala] def packedType(tree: Tree, owner: Symbol): Type = packedTypeInternal(tree, owner)
+        final private[scala] def resolveTypeTag(pos: Position, pre: Type, tp: Type, concrete: Boolean, allowMaterialization: Boolean = true): Tree = resolveTypeTagInternal(pos, pre, tp, concrete, allowMaterialization)
+    
+        final private[nsc] def atOwner(owner: Symbol): Typer = atOwnerInternal(owner)
+        final private[nsc] def context1: Context = context1Internal
+        final private[nsc] def typedCases(cases: List[CaseDef], pattp: Type, pt: Type): List[CaseDef] = typedCasesInternal(cases, pattp, pt)
+        final private[nsc] def typed(tree: Tree, pt: Type): Tree = typedInternal(tree, pt)
+        final private[nsc] def typed(tree: Tree, mode: Mode): Tree = typedInternal(tree, mode)
+        final private[nsc] def typedOperator(tree: Tree): Tree = typedOperatorInternal(tree)
+        final private[nsc] def atOwner(tree: Tree, owner: Symbol): Typer = atOwnerInternal(tree, owner)
+        final private[nsc] def typedPos(pos: Position)(tree: Tree): Tree = typedPosInternal(pos)(tree)
+        final private[nsc] def typedQualifier(tree: Tree): Tree = typedQualifierInternal(tree)
+        final private[nsc] def typedQualifier(tree: Tree, mode: Mode, pt: Type): Tree = typedQualifierInternal(tree, mode, pt)
+        final private[nsc] def namer: Namer = namerInternal
+        final private[nsc] def typedStats(stats: List[Tree], exprOwner: Symbol): List[Tree] = typedStatsInternal(stats, exprOwner)
+    
+        final private[typechecker] def samToFunctionType(tp: Type, sam: Symbol = NoSymbol): Type = samToFunctionTypeInternal(tp, sam)
+        final private[typechecker] def checkFeature(pos: Position, featureTrait: Symbol, construct: => String = "", immediate: Boolean = false): Boolean = checkFeatureInternal(pos, featureTrait, construct, immediate)
+        final private[typechecker] def instantiatePossiblyExpectingUnit(tree: Tree, mode: Mode, pt: Type): Tree = instantiatePossiblyExpectingUnitInternal(tree, mode, pt)
+        final private[typechecker] def qualifyingClass(tree: Tree, qual: Name, packageOK: Boolean): Symbol = qualifyingClassInternal(tree, qual, packageOK)
+        final private[typechecker] def checkNonCyclic(pos: Position, tp: Type): Boolean = checkNonCyclicInternal(pos, tp)
+        final private[typechecker] def computeMacroDefType(ddef: DefDef, pt: Type): Type = computeMacroDefTypeInternal(ddef, pt)
+        final private[typechecker] def computeType(tree: Tree, pt: Type): Type = computeTypeInternal(tree, pt)
+        final private[typechecker] def typedParentTypes(templ: Template): List[Tree] = typedParentTypesInternal(templ)
+        final private[typechecker] def reenterTypeParams(tparams: List[TypeDef]): List[Symbol] = reenterTypeParamsInternal(tparams)
+        final private[typechecker] def typedAnnotation(ann: Tree, mode: Mode = EXPRmode): AnnotationInfo = typedAnnotationInternal(ann, mode)
+        final private[typechecker] def permanentlyHiddenWarning(pos: Position, hidden: Name, defn: Symbol): Unit = permanentlyHiddenWarningInternal(pos, hidden, defn)
+        final private[typechecker] def doTypedApply(tree: Tree, fun0: Tree, args: List[Tree], mode: Mode, pt: Type): Tree = doTypedApplyInternal(tree, fun0, args, mode, pt)
+        final private[typechecker] def isNamedApplyBlock(tree: Tree): Boolean = isNamedApplyBlockInternal(tree)
+        final private[typechecker] def applyImplicitArgs(fun: Tree): Tree = applyImplicitArgsInternal(fun)
+        final private[typechecker] def instantiate(tree: Tree, mode: Mode, pt: Type): Tree = instantiateInternal(tree, mode, pt)
+        final private[typechecker] def adaptToMember(qual: Tree, searchTemplate: Type, reportAmbiguous: Boolean = true, saveErrors: Boolean = true): Tree = adaptToMemberInternal(qual, searchTemplate, reportAmbiguous, saveErrors)
+        final private[typechecker] def typedArgs(args: List[Tree], mode: Mode): List[Tree] = typedArgsInternal(args, mode)
+        final private[typechecker] def makeAccessible(tree: Tree, sym: Symbol, pre: Type, site: Tree): (Tree, Type) = makeAccessibleInternal(tree, sym, pre, site)
+        final private[typechecker] def cyclicReferenceMessage(sym: Symbol, tree: Tree): Option[String] = cyclicReferenceMessageInternal(sym, tree)
+        final private[typechecker] def checkUnused: checkUnusedObject = checkUnusedInternal
+        final private[typechecker] val runDefinitions: definitions.RunDefinitions = runDefinitionsInternal
+        final private[typechecker] def reallyExists(sym: Symbol): Boolean = reallyExistsInternal(sym)
+        final private[typechecker] def typedArg(arg: Tree, mode: Mode, newmode: Mode, pt: Type): Tree = typedArgInternal(arg, mode, newmode, pt)
+        final private[typechecker] def typedType(tree: Tree, mode: Mode): Tree = typedTypeInternal(tree, mode) 
+        final private[typechecker] def typedPos(pos: Position, mode: Mode, pt: Type)(tree: Tree): Tree = typedPosInternal(pos, mode, pt)(tree)
+        final private[typechecker] def typedByValueExpr(tree: Tree, pt: Type = WildcardType): Tree = typedByValueExprInternal(tree, pt)
+        final private[typechecker] def typedTypeApply(tree: Tree, mode: Mode, fun: Tree, args: List[Tree]): Tree = typedTypeApplyInternal(tree, mode, fun, args)
+        private[typechecker] def adapt(tree: Tree,mode: Mode,pt: Type,original: Tree): Tree = internalAdapt(tree, mode, pt, original)
+        private[scala] def typed(tree: Tree, mode: Mode, pt: Type): Tree = internalTyped(tree, mode, pt)
+        private[typechecker] def typed1(tree: Tree, mode: Mode,pt: Type): Tree = internalTyped1(tree, mode, pt)
+        private[nsc] lazy val TyperErrorGen: TyperErrorGenObject = TyperErrorGenInternal
+        private[nsc] def macroImplementationNotFoundMessage(name: Name): String = internalMacroImplementationNotFoundMessage(name)
+      }
+      (typerProxy, overriddenMethods(typer))
+  }
+  
+  private trait Test { self: DefaultTyper =>
+    override private[typechecker] val (internalTyper, overridden) = newTyperProxy(this)
+  }
+  
+  private abstract class DefaultTyper(context0: Context, decorations:Option[OverridableTyperMethods]) extends Typer(context0, preventOverride = true) with Test with DefaultTyperDiagnostics with Adaptation with Tag with PatternTyper with DefaultTyperContextErrors {
     import context0.unit
     import typeDebug.{ ptTree, ptBlock, ptLine, inGreen, inRed }
-    import TyperErrorGen._
-    val runDefinitions = currentRun.runDefinitions
+    import TyperErrorGenInternal._
+    val runDefinitionsInternal = currentRun.runDefinitions
     import runDefinitions._
     
-    private val decorations = typerSettings.decorationsFor(this)
+    private def implement[T](selectHook: OverridableTyperMethods => T)(implementation: T):T = 
+      decorations map selectHook getOrElse implementation
     
-    def typed(tree: Tree, mode: Mode, pt: Type): Tree = {
-      val withHook = decorations.implement(_.typedHook)(internalTyped) 
+    override def typed(tree: Tree, mode: Mode, pt: Type): Tree = {
+      val withHook = implement(_.typed)(internalTyped) 
     	withHook(tree, mode, pt)
     } 
-    def typed1(tree: Tree, mode: Mode, pt: Type): Tree = {
-      val withHook = decorations.implement(_.typed1Hook)(internalTyped1)
+    override def typed1(tree: Tree, mode: Mode, pt: Type): Tree = {
+      val withHook = implement(_.typed1)(internalTyped1)
       withHook(tree, mode, pt)
     }
-    def finishMethodSynthesis(templ: Template, clazz: Symbol, context: Context): Template = {
-      val withHook = decorations.implement(_.finishMethodSynthesisHook)(internalFinishMethodSynthesis)
+    override def finishMethodSynthesis(templ: Template, clazz: Symbol, context: Context): Template = {
+      val withHook = implement(_.finishMethodSynthesis)(internalFinishMethodSynthesis)
       withHook(templ, clazz, context)
     }
-    def adapt(tree: Tree, mode: Mode, pt: Type, original: Tree = EmptyTree): Tree = {
-      val withHook = decorations.implement(_.adaptHook)(internalAdapt)
+    override def adapt(tree: Tree, mode: Mode, pt: Type, original: Tree = EmptyTree): Tree = {
+      val withHook = implement(_.adapt)(internalAdapt)
       withHook(tree, mode, pt, original)
     }
-    def stabilize(tree: Tree, pre: Type, mode: Mode, pt: Type): Tree = {
-      val withHook = decorations.implement(_.stabilizeHook)(internalStabilize)
+    override def stabilize(tree: Tree, pre: Type, mode: Mode, pt: Type): Tree = {
+      val withHook = implement(_.stabilize)(internalStabilize)
       withHook(tree, pre, mode, pt)
     }
-    def macroImplementationNotFoundMessage(name:Name):String = {
-      val withHook = decorations.implement(_.macroImplementationNotFoundMessageHook)(internalMacroImplementationNotFoundMessage)
+    override def macroImplementationNotFoundMessage(name:Name):String = {
+      val withHook = implement(_.macroImplementationNotFoundMessage)(internalMacroImplementationNotFoundMessage)
       withHook(name)
     }
-    def typedDocDef(docDef: DocDef, mode: Mode, pt: Type): Tree = {
-      val withHook = decorations.implement(_.typedDocDefHook)(internalTypedDocDef)
+    override def typedDocDef(docDef: DocDef, mode: Mode, pt: Type): Tree = {
+      val withHook = implement(_.typedDocDef)(internalTypedDocDef)
       withHook(docDef, mode, pt)
     }
-    def missingSelectErrorTree(tree: Tree, qual: Tree, name: Name): Tree = {
-      val withHook = decorations.implement(_.missingSelectErrorTreeHook)(internalMissingSelectErrorTree)
+    override def missingSelectErrorTree(tree: Tree, qual: Tree, name: Name): Tree = {
+      val withHook = implement(_.missingSelectErrorTree)(internalMissingSelectErrorTree)
       withHook(tree, qual, name)
+    }
+    override def canAdaptConstantTypeToLiteral:Boolean = {
+      val withHook = implement(_.canAdaptConstantTypeToLiteral)(internalCanAdaptConstantTypeToLiteral)
+      withHook()
+    }
+    override def canTranslateEmptyListToNil:Boolean = {
+  	  val withHook = implement(_.canTranslateEmptyListToNil)(internalCanTranslateEmptyListToNil)
+		  withHook()
     }
     
     private def newTyper(context: Context):DefaultTyper = 
-      new NormalTyper(context, typerSettings)
+      new NormalTyper(context, None)
     
     private val transformed: mutable.Map[Tree, Tree] = unit.transformed
 
-    val infer:Inferencer = new DefaultInferencer {
+    val inferInternal:Inferencer = new DefaultInferencer {
       def context = DefaultTyper.this.context
       // See SI-3281 re undoLog
       override def isCoercible(tp: Type, pt: Type) = undoLog undo viewExists(tp, pt)
     }
 
     /** Overridden to false in scaladoc and/or interactive. */
-    def canAdaptConstantTypeToLiteral = typerSettings.canAdaptConstantTypeToLiteral
-    def canTranslateEmptyListToNil    = typerSettings.canTranslateEmptyListToNil
+    def internalCanAdaptConstantTypeToLiteral() = true
+    def internalCanTranslateEmptyListToNil()    = true
     def internalMissingSelectErrorTree(tree: Tree, qual: Tree, name: Name): Tree = tree
 
     def internalTypedDocDef(docDef: DocDef, mode: Mode, pt: Type): Tree =
@@ -181,7 +274,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
 
     /** Find implicit arguments and pass them to given tree.
      */
-    def applyImplicitArgs(fun: Tree): Tree = fun.tpe match {
+    def applyImplicitArgsInternal(fun: Tree): Tree = fun.tpe match {
       case MethodType(params, _) =>
         val argResultsBuff = new ListBuffer[SearchResult]()
         val argBuff = new ListBuffer[Tree]()
@@ -278,14 +371,16 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
     import infer._
 
     private var namerCache: Namer = null
-    def namer = {
+    def namerInternal = {
       if ((namerCache eq null) || namerCache.context != context)
         namerCache = newNamer(context)
       namerCache
     }
 
-    var context = context0
-    def context1 = context
+    private var _context = context0
+    def contextInternal = _context
+    def context_=(value:Context) = _context = value
+    def context1Internal = context
 
     def dropExistential(tp: Type): Type = tp match {
       case ExistentialType(tparams, tpe) =>
@@ -335,7 +430,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
 
     /** Check that type `tp` is not a subtype of itself.
      */
-    def checkNonCyclic(pos: Position, tp: Type): Boolean = {
+    def checkNonCyclicInternal(pos: Position, tp: Type): Boolean = {
       def checkNotLocked(sym: Symbol) = {
         sym.initialize.lockOK || { CyclicAliasingOrSubtypingError(pos, sym); false }
       }
@@ -476,7 +571,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
           context.scope enter vparam.symbol
     }
 
-    def reenterTypeParams(tparams: List[TypeDef]): List[Symbol] =
+    def reenterTypeParamsInternal(tparams: List[TypeDef]): List[Symbol] =
       for (tparam <- tparams) yield {
         context.scope enter tparam.symbol
         tparam.symbol.deSkolemize
@@ -486,7 +581,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
      *  of a this or super with prefix `qual`.
      *  packageOk is equal false when qualifying class symbol
      */
-    def qualifyingClass(tree: Tree, qual: Name, packageOK: Boolean) =
+    def qualifyingClassInternal(tree: Tree, qual: Name, packageOK: Boolean) =
       context.enclClass.owner.ownerChain.find(o => qual.isEmpty || o.isClass && o.name == qual) match {
         case Some(c) if packageOK || !c.isPackageClass => c
         case _                                         => QualifyingClassError(tree, qual) ; NoSymbol
@@ -531,7 +626,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
 
     /** Is symbol defined and not stale?
      */
-    def reallyExists(sym: Symbol) = {
+    def reallyExistsInternal(sym: Symbol) = {
       if (isStale(sym)) sym.setInfo(NoType)
       sym.exists
     }
@@ -571,7 +666,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
      *  (illegal type applications in pre will be skipped -- that's why typedSelect wraps the resulting tree in a TreeWithDeferredChecks)
      *  @return modified tree and new prefix type
      */
-    def makeAccessible(tree: Tree, sym: Symbol, pre: Type, site: Tree): (Tree, Type) =
+    def makeAccessibleInternal(tree: Tree, sym: Symbol, pre: Type, site: Tree): (Tree, Type) =
       if (context.isInPackageObject(sym, pre.typeSymbol)) {
         if (pre.typeSymbol == ScalaPackageClass && sym.isTerm) {
           // short cut some aliases. It seems pattern matching needs this
@@ -697,7 +792,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
       else qual.tpe nonLocalMember name
     }
 
-    def silent[T](op: Typer => T,
+    def silentInternal[T](op: Typer => T,
                   reportAmbiguousErrors: Boolean = context.ambiguousErrors,
                   newtree: Tree = context.tree): SilentResult[T] = {
       val rawTypeStart = if (Statistics.canEnable) Statistics.startCounter(rawTypeFailed) else null
@@ -762,7 +857,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
      *  @return if feature check is run immediately: true if feature is enabled, false otherwise
      *          if feature check is delayed or suppressed because we are past typer: true
      */
-    def checkFeature(pos: Position, featureTrait: Symbol, construct: => String = "", immediate: Boolean = false): Boolean =
+    def checkFeatureInternal(pos: Position, featureTrait: Symbol, construct: => String = "", immediate: Boolean = false): Boolean =
       if (isPastTyper) true
       else {
         val nestedOwners =
@@ -799,7 +894,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
      * (no type precision is lost by the extrapolation,
      *  but this facilitates dealing with the types arising from Java's use-site variance).
      */
-    def samToFunctionType(tp: Type, sam: Symbol = NoSymbol): Type = {
+    def samToFunctionTypeInternal(tp: Type, sam: Symbol = NoSymbol): Type = {
       val samSym = sam orElse samOf(tp)
 
       def correspondingFunctionSymbol = {
@@ -1211,7 +1306,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
       adapt(tree, mode, pt, original)
     }
 
-    def instantiate(tree: Tree, mode: Mode, pt: Type): Tree = {
+    def instantiateInternal(tree: Tree, mode: Mode, pt: Type): Tree = {
       inferExprInstance(tree, context.extractUndetparams(), pt)
       adapt(tree, mode, pt)
     }
@@ -1228,7 +1323,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
       }
     }
 
-    def instantiatePossiblyExpectingUnit(tree: Tree, mode: Mode, pt: Type): Tree = {
+    def instantiatePossiblyExpectingUnitInternal(tree: Tree, mode: Mode, pt: Type): Tree = {
       if (mode.typingExprNotFun && pt.typeSymbol == UnitClass && !tree.tpe.isInstanceOf[MethodType])
         instantiateExpectingUnit(tree, mode)
       else
@@ -1255,7 +1350,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
       )
     }
 
-    def adaptToMember(qual: Tree, searchTemplate: Type, reportAmbiguous: Boolean = true, saveErrors: Boolean = true): Tree = {
+    def adaptToMemberInternal(qual: Tree, searchTemplate: Type, reportAmbiguous: Boolean = true, saveErrors: Boolean = true): Tree = {
       if (isAdaptableWithView(qual)) {
         qual.tpe.dealiasWiden match {
           case et: ExistentialType =>
@@ -1677,7 +1772,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
         )
     }
 
-    def typedParentTypes(templ: Template): List[Tree] = templ.parents match {
+    def typedParentTypesInternal(templ: Template): List[Tree] = templ.parents match {
       case Nil => List(atPos(templ.pos)(TypeTree(AnyRefTpe)))
       case first :: rest =>
         try {
@@ -1887,7 +1982,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
      *  ...but it turns out it's also the ideal spot for namer/typer coordination for
      *  the tricky method synthesis scenarios, so we'll make it that.
      */
-    protected def internalFinishMethodSynthesis(templ: Template, clazz: Symbol, context: Context): Template = {
+    def internalFinishMethodSynthesis(templ: Template, clazz: Symbol, context: Context): Template = {
       addSyntheticMethods(templ, clazz, context)
     }
     /** For flatMapping a list of trees when you want the DocDefs and Annotated
@@ -2489,7 +2584,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
       treeCopy.CaseDef(cdef, pat1, guard1, body1) setType body1.tpe
     }
 
-    def typedCases(cases: List[CaseDef], pattp: Type, pt: Type): List[CaseDef] =
+    def typedCasesInternal(cases: List[CaseDef], pattp: Type, pt: Type): List[CaseDef] =
       cases mapConserve { cdef =>
         newTyper(context.makeNewScope(cdef, context.owner)).typedCase(cdef, pattp, pt)
       }
@@ -3070,7 +3165,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
       case _                  => log("unhandled import: "+imp+" in "+unit); imp
     }
 
-    def typedStats(stats: List[Tree], exprOwner: Symbol): List[Tree] = {
+    def typedStatsInternal(stats: List[Tree], exprOwner: Symbol): List[Tree] = {
       val inBlock = exprOwner == context.owner
       def includesTargetPos(tree: Tree) =
         tree.pos.isRange && context.unit.exists && (tree.pos includes context.unit.targetPos)
@@ -3212,13 +3307,13 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
       }
     }
 
-    def typedArg(arg: Tree, mode: Mode, newmode: Mode, pt: Type): Tree = {
+    def typedArgInternal(arg: Tree, mode: Mode, newmode: Mode, pt: Type): Tree = {
       val typedMode = mode.onlySticky | newmode
       val t = withCondConstrTyper(mode.inSccMode)(_.typed(arg, typedMode, pt))
       checkDead.inMode(typedMode, t)
     }
 
-    def typedArgs(args: List[Tree], mode: Mode) =
+    def typedArgsInternal(args: List[Tree], mode: Mode) =
       args mapConserve (arg => typedArg(arg, mode, NOmode, WildcardType))
 
     /** Does function need to be instantiated, because a missing parameter
@@ -3247,7 +3342,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
 
     /** Is `tree` a block created by a named application?
      */
-    def isNamedApplyBlock(tree: Tree) =
+    def isNamedApplyBlockInternal(tree: Tree) =
       context.namedApplyBlockInfo exists (_._1 == tree)
 
     def callToCompanionConstr(context: Context, calledFun: Symbol) = {
@@ -3261,7 +3356,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
       }
     }
 
-    def doTypedApply(tree: Tree, fun0: Tree, args: List[Tree], mode: Mode, pt: Type): Tree = {
+    def doTypedApplyInternal(tree: Tree, fun0: Tree, args: List[Tree], mode: Mode, pt: Type): Tree = {
       // TODO_NMT: check the assumption that args nonEmpty
       def duplErrTree = setError(treeCopy.Apply(tree, fun0, args))
       def duplErrorTree(err: AbsTypeError) = { context.issue(err); duplErrTree }
@@ -3612,7 +3707,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
     /**
      * Convert an annotation constructor call into an AnnotationInfo.
      */
-    def typedAnnotation(ann: Tree, mode: Mode = EXPRmode): AnnotationInfo = {
+    def typedAnnotationInternal(ann: Tree, mode: Mode = EXPRmode): AnnotationInfo = {
       var hasError: Boolean = false
       val pending = ListBuffer[AbsTypeError]()
 
@@ -3838,7 +3933,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
     }
 
     /** convert local symbols and skolems to existentials */
-    def packedType(tree: Tree, owner: Symbol): Type = {
+    def packedTypeInternal(tree: Tree, owner: Symbol): Type = {
       def defines(tree: Tree, sym: Symbol) = (
            sym.isExistentialSkolem && sym.unpackLocation == tree
         || tree.isDef && tree.symbol == sym
@@ -3952,7 +4047,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
     }
 
     // lifted out of typed1 because it's needed in typedImplicit0
-    private[typechecker] def typedTypeApply(tree: Tree, mode: Mode, fun: Tree, args: List[Tree]): Tree = fun.tpe match {
+    private[typechecker] def typedTypeApplyInternal(tree: Tree, mode: Mode, fun: Tree, args: List[Tree]): Tree = fun.tpe match {
       case OverloadedType(pre, alts) =>
         inferPolyAlternatives(fun, mapList(args)(treeTpe))
 
@@ -5489,39 +5584,39 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
       }
     }
 
-    def atOwner(owner: Symbol): Typer =
+    def atOwnerInternal(owner: Symbol): Typer =
       newTyper(context.make(owner = owner))
 
-    def atOwner(tree: Tree, owner: Symbol): Typer =
+    def atOwnerInternal(tree: Tree, owner: Symbol): Typer =
       newTyper(context.make(tree, owner))
 
     /** Types expression or definition `tree`.
      */
-    def typed(tree: Tree): Tree = {
+    def typedInternal(tree: Tree): Tree = {
       val ret = typed(tree, context.defaultModeForTyped, WildcardType)
       ret
     }
 
-    def typedByValueExpr(tree: Tree, pt: Type = WildcardType): Tree = typed(tree, EXPRmode | BYVALmode, pt)
+    def typedByValueExprInternal(tree: Tree, pt: Type = WildcardType): Tree = typed(tree, EXPRmode | BYVALmode, pt)
 
-    def typedPos(pos: Position, mode: Mode, pt: Type)(tree: Tree) = typed(atPos(pos)(tree), mode, pt)
-    def typedPos(pos: Position)(tree: Tree) = typed(atPos(pos)(tree))
+    def typedPosInternal(pos: Position, mode: Mode, pt: Type)(tree: Tree) = typed(atPos(pos)(tree), mode, pt)
+    def typedPosInternal(pos: Position)(tree: Tree) = typed(atPos(pos)(tree))
     // TODO: see if this formulation would impose any penalty, since
     // it makes for a lot less casting.
     // def typedPos[T <: Tree](pos: Position)(tree: T): T = typed(atPos(pos)(tree)).asInstanceOf[T]
 
     /** Types expression `tree` with given prototype `pt`.
      */
-    def typed(tree: Tree, pt: Type): Tree =
+    def typedInternal(tree: Tree, pt: Type): Tree =
       typed(tree, context.defaultModeForTyped, pt)
 
-    def typed(tree: Tree, mode: Mode): Tree =
+    def typedInternal(tree: Tree, mode: Mode): Tree =
       typed(tree, mode, WildcardType)
 
     /** Types qualifier `tree` of a select node.
      *  E.g. is tree occurs in a context like `tree.m`.
      */
-    def typedQualifier(tree: Tree, mode: Mode, pt: Type): Tree =
+    def typedQualifierInternal(tree: Tree, mode: Mode, pt: Type): Tree =
       typed(tree, PolyQualifierModes | mode.onlyTypePat, pt) // TR: don't set BYVALmode, since qualifier might end up as by-name param to an implicit
 
     /** Types qualifier `tree` of a select node.
@@ -5530,10 +5625,10 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
     def typedQualifier(tree: Tree, mode: Mode): Tree =
       typedQualifier(tree, mode, WildcardType)
 
-    def typedQualifier(tree: Tree): Tree = typedQualifier(tree, NOmode, WildcardType)
+    def typedQualifierInternal(tree: Tree): Tree = typedQualifier(tree, NOmode, WildcardType)
 
     /** Types function part of an application */
-    def typedOperator(tree: Tree): Tree = typed(tree, OperatorModes)
+    def typedOperatorInternal(tree: Tree): Tree = typed(tree, OperatorModes)
 
     // the qualifier type of a supercall constructor is its first parent class
     private def typedSelectOrSuperQualifier(qual: Tree) =
@@ -5566,11 +5661,11 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
     }
 
     /** Types a (fully parameterized) type tree */
-    def typedType(tree: Tree, mode: Mode): Tree =
+    def typedTypeInternal(tree: Tree, mode: Mode): Tree =
       typed(tree, mode.forTypeMode, WildcardType)
 
     /** Types a (fully parameterized) type tree */
-    def typedType(tree: Tree): Tree = typedType(tree, NOmode)
+    def typedTypeInternal(tree: Tree): Tree = typedType(tree, NOmode)
 
     /** Types a higher-kinded type tree -- pt denotes the expected kind and must be one of `Kind.WildCard` and `Kind.FromParams` */
     def typedHigherKindedType(tree: Tree, mode: Mode, pt: Type): Tree =
@@ -5599,9 +5694,9 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
       }
     }
 
-    def typedTypeConstructor(tree: Tree): Tree = typedTypeConstructor(tree, NOmode)
+    def typedTypeConstructorInternal(tree: Tree): Tree = typedTypeConstructor(tree, NOmode)
 
-    def computeType(tree: Tree, pt: Type): Type = {
+    def computeTypeInternal(tree: Tree, pt: Type): Type = {
       // macros employ different logic of `computeType`
       assert(!context.owner.isMacro, context.owner)
       val tree1 = typed(tree, pt)
@@ -5611,7 +5706,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
       tpe
     }
 
-    def computeMacroDefType(ddef: DefDef, pt: Type): Type = {
+    def computeMacroDefTypeInternal(ddef: DefDef, pt: Type): Type = {
       assert(context.owner.isMacro, context.owner)
       assert(ddef.symbol.isMacro, ddef.symbol)
 

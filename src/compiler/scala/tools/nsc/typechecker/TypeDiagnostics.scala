@@ -440,10 +440,10 @@ private[typechecker] trait TypeDiagnostics {
   trait DefaultTyperDiagnostics {
     self: Typer =>
 
-    def permanentlyHiddenWarning(pos: Position, hidden: Name, defn: Symbol) =
+    def permanentlyHiddenWarningInternal(pos: Position, hidden: Name, defn: Symbol) =
       context.warning(pos, "imported `%s' is permanently hidden by definition of %s".format(hidden, defn.fullLocationString))
 
-    object checkUnused extends checkUnusedObject {
+    object checkUnusedInternal extends checkUnusedObject {
       val ignoreNames = Set[TermName]("readResolve", "readObject", "writeObject", "writeReplace")
 
       class UnusedPrivates extends Traverser {
@@ -595,7 +595,7 @@ private[typechecker] trait TypeDiagnostics {
     /** Returns Some(msg) if the given tree is untyped apparently due
      *  to a cyclic reference, and None otherwise.
      */
-    def cyclicReferenceMessage(sym: Symbol, tree: Tree) = condOpt(tree) {
+    def cyclicReferenceMessageInternal(sym: Symbol, tree: Tree) = condOpt(tree) {
       case ValDef(_, _, tpt, _) if tpt.tpe == null        => "recursive "+sym+" needs type"
       case DefDef(_, _, _, _, tpt, _) if tpt.tpe == null  => List(cyclicAdjective(sym), sym, "needs result type") mkString " "
       case Import(expr, selectors)                        =>

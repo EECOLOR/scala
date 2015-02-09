@@ -16,30 +16,18 @@ trait ScaladocAnalyzer extends Analyzer {
   val global : Global // generally, a ScaladocGlobal
   import global._
 
-  override def newTyper(context: Context, settings: TyperSettings = TyperSettings.Default): Typer = 
-    super.newTyper(context, settings.copy(
-        decorations = Some(newScalaDocTyperDecorations),
-        canAdaptConstantTypeToLiteral = false))
-
-  private def newScalaDocTyperDecorations(typer:Typer) = {
-    val scaladocTyper = new ScaladocTyper(typer)
-    TyperDecorations(
-      macroImplementationNotFoundMessageHook = Some(scaladocTyper.macroImplementationNotFoundMessage),
-      typedDocDefHook = Some(scaladocTyper.typedDocDef)
-    )
-  }
+  override def newTyper(context: Context): Typer = new ScaladocTyper(context) 
     
-  private class ScaladocTyper(typer:Typer) {
-    import typer._
+  private class ScaladocTyper(_context:Context) extends Typer(_context) {
     
     private def unit = context.unit
 
-    def macroImplementationNotFoundMessage(`super.macroImplementationNotFoundMessage`: Name => String)(name: Name): String = (
-        `super.macroImplementationNotFoundMessage`(name)
+    override def macroImplementationNotFoundMessage(name: Name): String = (
+        super.macroImplementationNotFoundMessage(name)
       + "\nWhen generating scaladocs for multiple projects at once, consider using -Ymacro-no-expand to disable macro expansions altogether."
     )
 
-    def typedDocDef(`super.typedDocDef`: (DocDef, Mode, Type) => Tree)(docDef: DocDef, mode: Mode, pt: Type): Tree = {
+    override def typedDocDef(docDef: DocDef, mode: Mode, pt: Type): Tree = {
       val sym = docDef.symbol
 
       if ((sym ne null) && (sym ne NoSymbol)) {
@@ -60,7 +48,7 @@ trait ScaladocAnalyzer extends Analyzer {
         }
       }
 
-      `super.typedDocDef`(docDef, mode, pt)
+      super.typedDocDef(docDef, mode, pt)
     }
 
     def defineUseCases(useCase: UseCase): List[Symbol] = {
