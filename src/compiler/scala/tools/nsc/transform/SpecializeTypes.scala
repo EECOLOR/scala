@@ -50,7 +50,7 @@ import scala.annotation.tailrec
  *
  *     Above, `A$mcI$sp` cannot access `d`, so the method cannot be typechecked.
  */
-abstract class DefaultSpecializeTypes extends InfoTransform with SpecializeTypes with TypingTransformers {
+private[nsc] abstract class DefaultSpecializeTypes extends InfoTransform with SpecializeTypes with TypingTransformers {
   import global._
   import definitions._
   import Flags._
@@ -1255,11 +1255,21 @@ abstract class DefaultSpecializeTypes extends InfoTransform with SpecializeTypes
   /** This duplicator additionally performs casts of expressions if that is allowed by the `casts` map. */
   private class DefaultDuplicator(casts: Map[Symbol, Type]) extends {
     val global: DefaultSpecializeTypes.this.global.type = DefaultSpecializeTypes.this.global
-  } with typechecker.Duplicators with Duplicator {
+  } with typechecker.Duplicators with typechecker.DefaultAnalyzer with Duplicator {
     private val (castfrom, castto) = casts.unzip
     private object CastMap extends SubstTypeMap(castfrom.toList, castto.toList)
 
-    class BodyDuplicator(_context: Context) extends super.BodyDuplicator(_context) {
+    /** Return the special typer for duplicate method bodies. */
+    override def newTyper(context: Context, settings:TyperSettings = TyperSettings.Default): Typer =
+      super.newTyper(context, settings.copy(decorations = Some(newBodyDuplicatorDecorations)))
+    
+    // it's quite weird we override it here because this is the only place Duplicator is used
+    override protected def newBodyDuplicatorDecorations(self:Typer) = {
+      val bodyDuplicator = new BodyDuplicator(self)
+      TyperDecorations(typedHook = Some(bodyDuplicator.typed))
+    } 
+    
+    class BodyDuplicator(typer:Typer) extends super.BodyDuplicator(typer) {
       override def castType(tree: Tree, pt: Type): Tree = {
         tree modifyType fixType
         // log(" tree type: " + tree.tpe)
@@ -1273,8 +1283,6 @@ abstract class DefaultSpecializeTypes extends InfoTransform with SpecializeTypes
         ntree.clearType()
       }
     }
-
-    protected override def newBodyDuplicator(context: Context) = new BodyDuplicator(context)
   }
 
   /** Introduced to fix SI-7343: Phase ordering problem between Duplicators and Specialization.

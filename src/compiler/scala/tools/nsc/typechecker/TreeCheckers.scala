@@ -12,13 +12,18 @@ import util.returning
 import scala.reflect.internal.util.shortClassOfInstance
 import scala.reflect.internal.util.StringOps._
 
-trait TreeCheckers {
-  self: Globals =>
-  
-  def checkTrees():Unit
-}
-
-abstract class DefaultTreeCheckers extends TreeCheckers with DefaultAnalyzer {
+abstract class DefaultTreeCheckers extends TreeCheckers with Typers with Contexts { 
+  self:  
+  // required by typechecker.Typers
+  typechecker.Globals with
+  //typechecker.Contexts
+  typechecker.ContextErrors with
+  typechecker.Infer with 
+  typechecker.Namers with
+  // required by typechecker.Contexts
+  //typechecker.ContextErrors with
+  typechecker.Implicits with
+  typechecker.NamesDefaults =>
 
   import global._
 
@@ -218,23 +223,26 @@ abstract class DefaultTreeCheckers extends TreeCheckers with DefaultAnalyzer {
     val context = rootContext(unit, checking = true)
     tpeOfTree.clear()
     SymbolTracker.check(phase, unit)
-    val checker = new TreeChecker(context)
+    val checker = newTyper(context)
     runWithUnit(unit) {
-      checker.precheck.traverse(unit.body)
+      precheck.traverse(unit.body)
       checker.typed(unit.body)
-      checker.postcheck.traverse(unit.body)
+      postcheck.traverse(unit.body)
     }
   }
 
-  override def newTyper(context: Context) = new TreeChecker(context)
+  override def newTyper(context: Context, settings:TyperSettings = TyperSettings.Default):Typer = 
+    super.newTyper(context, settings.copy(decorations = Some(TreeChecker)))
 
-  class TreeChecker(context0: Context) extends DefaultTyper(context0) {
+  def TreeChecker(self: Typer) = {
+    import self._
+    
     // If we don't intercept this all the synthetics get added at every phase,
     // with predictably unfortunate results.
-    override protected def finishMethodSynthesis(templ: Template, clazz: Symbol, context: Context): Template = templ
+    def finishMethodSynthesis(`super.finishMethodSynthesis`: (Template, Symbol, Context) => Template)(templ: Template, clazz: Symbol, context: Context): Template = templ
 
     // XXX check for tree.original on TypeTrees.
-    private def treesDiffer(t1: Tree, t2: Tree): Unit = {
+    def treesDiffer(t1: Tree, t2: Tree): Unit = {
       def len1 = t1.toString.length
       def len2 = t2.toString.length
       def name = t1 match {
@@ -245,31 +253,18 @@ abstract class DefaultTreeCheckers extends TreeCheckers with DefaultAnalyzer {
       errorFn(t1.pos, summary + diff(t1, t2))
     }
 
-    private def typesDiffer(tree: Tree, tp1: Type, tp2: Type) =
-      errorFn(tree.pos, "types differ\n old: " + tp1 + "\n new: " + tp2 + "\n tree: " + tree)
-
-    /** XXX Disabled reporting of position errors until there is less noise. */
-    private def noPos(t: Tree) =
-      () // errorFn("no pos: " + treestr(t))
-    private def noType(t: Tree) =
-      errorFn(t.pos, "no type: " + treestr(t))
-
-    private def checkSym(t: Tree) =
-      if (t.symbol == NoSymbol)
-        errorFn(t.pos, "no symbol: " + treestr(t))
-
-    private def passThrough(tree: Tree) = tree match {
+    def passThrough(tree: Tree) = tree match {
       case EmptyTree | TypeTree() => true
       case _                      => tree.tpe eq null
     }
-    override def typed(tree: Tree, mode: Mode, pt: Type): Tree = (
+    def typed(`super.typed`: (Tree, Mode, Type) => Tree)(tree: Tree, mode: Mode, pt: Type): Tree = (
       if (passThrough(tree))
-        super.typed(tree, mode, pt)
+        `super.typed`(tree, mode, pt)
       else
-        checkedTyped(tree, mode, pt)
+        checkedTyped(`super.typed`)(tree, mode, pt)
     )
-    private def checkedTyped(tree: Tree, mode: Mode, pt: Type): Tree = {
-      val typed = wrap(tree)(super.typed(tree, mode, pt))
+    def checkedTyped(`super.typed`: (Tree, Mode, Type) => Tree)(tree: Tree, mode: Mode, pt: Type): Tree = {
+      val typed = wrap(tree)(`super.typed`(tree, mode, pt))
 
       if (tree ne typed)
         treesDiffer(tree, typed)
@@ -277,7 +272,23 @@ abstract class DefaultTreeCheckers extends TreeCheckers with DefaultAnalyzer {
       tree
     }
 
-    object precheck extends TreeStackTraverser {
+    TyperDecorations(
+        typedHook = Some(typed), 
+        finishMethodSynthesisHook = Some(finishMethodSynthesis)
+    )
+  }
+  
+  object precheck extends TreeStackTraverser {
+    def checkSym(t: Tree) =
+      if (t.symbol == NoSymbol)
+        errorFn(t.pos, "no symbol: " + treestr(t))
+    
+         /** XXX Disabled reporting of position errors until there is less noise. */
+    def noPos(t: Tree) =
+      () // errorFn("no pos: " + treestr(t))
+    def noType(t: Tree) =
+      errorFn(t.pos, "no type: " + treestr(t))
+        
       private var enclosingMemberDefs: List[MemberDef] = Nil
       private def pushMemberDef[T](md: MemberDef)(body: => T): T = {
         enclosingMemberDefs ::= md
@@ -431,22 +442,24 @@ abstract class DefaultTreeCheckers extends TreeCheckers with DefaultAnalyzer {
         case _ =>
       }
     }
+  
+  object postcheck extends Traverser {
+    private def typesDiffer(tree: Tree, tp1: Type, tp2: Type) =
+      errorFn(tree.pos, "types differ\n old: " + tp1 + "\n new: " + tp2 + "\n tree: " + tree)
 
-    object postcheck extends Traverser {
-      override def traverse(tree: Tree): Unit = tree match {
-        case EmptyTree | TypeTree() => ()
-        case _ =>
-          tpeOfTree get tree foreach { oldtpe =>
-            if (tree.tpe eq null)
-              errorFn(s"tree.tpe=null for " + tree.shortClass + " (symbol: " + classString(tree.symbol) + " " + signature(tree.symbol) + "), last seen tpe was " + oldtpe)
-            else if (oldtpe =:= tree.tpe)
-              ()
-            else
-              typesDiffer(tree, oldtpe, tree.tpe)
+    override def traverse(tree: Tree): Unit = tree match {
+      case EmptyTree | TypeTree() => ()
+      case _ =>
+        tpeOfTree get tree foreach { oldtpe =>
+          if (tree.tpe eq null)
+            errorFn(s"tree.tpe=null for " + tree.shortClass + " (symbol: " + classString(tree.symbol) + " " + signature(tree.symbol) + "), last seen tpe was " + oldtpe)
+          else if (oldtpe =:= tree.tpe)
+            ()
+          else
+            typesDiffer(tree, oldtpe, tree.tpe)
 
-            super.traverse(tree setType oldtpe)
-          }
+          super.traverse(tree setType oldtpe)
+        }
       }
     }
-  }
 }

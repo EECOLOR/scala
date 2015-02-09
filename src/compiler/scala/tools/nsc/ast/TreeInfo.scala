@@ -6,16 +6,20 @@
 package scala.tools.nsc
 package ast
 
+import scala.tools.nsc.symtab.SymbolTable
+
 /** This class ...
  *
  *  @author Martin Odersky
  *  @version 1.0
  */
 abstract class TreeInfo extends scala.reflect.internal.TreeInfo {
-  val global: Global
+  val global: SymbolTable with Trees
   import global._
   import definitions._
 
+  def enteringErasure[T](op: => T): T
+  
   // arg1.op(arg2) returns (arg1, op.symbol, arg2)
   object BinaryOp {
     def unapply(t: Tree): Option[(Tree, Symbol, Tree)] = t match {

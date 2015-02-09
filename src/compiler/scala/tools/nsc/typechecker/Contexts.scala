@@ -28,7 +28,7 @@ trait DefaultContexts extends Contexts {
   import definitions.{ JavaLangPackage, ScalaPackage, PredefModule, ScalaXmlTopScope, ScalaXmlPackage }
   import ContextMode._
 
-  protected def onTreeCheckerError(pos: Position, msg: String): Unit = ()
+  protected def onTreeCheckerErrorImplementation(pos: Position, msg: String): Unit = ()
 
   object NoContext
     extends DefaultContext(EmptyTree, NoSymbol, EmptyScope, NoCompilationUnit,

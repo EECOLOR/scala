@@ -31,9 +31,22 @@ trait ReplGlobal extends Global {
       new util.AbstractFileClassLoader(virtualDirectory, loader) {}
     }
 
-    override def newTyper(context: Context) = new DefaultTyper(context) {
-      override def typed(tree: Tree, mode: Mode, pt: Type): Tree = {
-        val res = super.typed(tree, mode, pt)
+    override def newTyper(context: Context, settings:TyperSettings = TyperSettings.Default) = { 
+      super.newTyper(context, settings.copy(decorations = Some(newCustomTyperDecorations)))
+    }
+    
+    private def newCustomTyperDecorations(typer:Typer) = {
+      val customTyper = new CustomTyper(typer)
+      TyperDecorations(
+        typedHook = Some(customTyper.typed)    
+      )
+    }
+    
+    private class CustomTyper(typer:Typer) {
+      import typer._
+      
+      def typed(`super.typed`: (Tree, Mode, Type) => Tree)(tree: Tree, mode: Mode, pt: Type): Tree = {
+        val res = `super.typed`(tree, mode, pt)
         tree match {
           case Ident(name) if !tree.symbol.hasPackageFlag && !name.toString.startsWith("$") =>
             repldbg("typed %s: %s".format(name, res.tpe))

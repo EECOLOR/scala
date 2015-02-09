@@ -44,6 +44,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     with Trees
     with Printers
     with DocComments
+    with CorrectReporter
     with Positions
     with Reporting
     with Parsing { self =>

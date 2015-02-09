@@ -11,7 +11,7 @@ object GlobalImplementations {
 
   private[nsc] def analyzerInstance(globalInstance: Global): typechecker.Analyzer with globalInstance.CorrectGlobalType =
     new {
-      val global: globalInstance.type = globalInstance
+      val global:globalInstance.type = globalInstance
     } with typechecker.DefaultAnalyzer
 
   private[nsc] def specializeTypesInstance(globalInstance: Global): SubComponent with SpecializeTypes with globalInstance.CorrectGlobalType =
@@ -26,11 +26,10 @@ object GlobalImplementations {
       val global: globalInstance.type = globalInstance
       val runsAfter = List("explicitouter")
       val runsRightAfter = Some("explicitouter")
-    } with DefaultErasure
+    } with DefaultErasure with typechecker.DefaultAnalyzer
 
   private[nsc] def treeCheckerInstance(globalInstance: Global): typechecker.TreeCheckers with globalInstance.CorrectGlobalType =
     new {
       val global: globalInstance.type = globalInstance
-    } with typechecker.DefaultTreeCheckers
-
+    } with typechecker.DefaultTreeCheckers with typechecker.DefaultAnalyzer
 }

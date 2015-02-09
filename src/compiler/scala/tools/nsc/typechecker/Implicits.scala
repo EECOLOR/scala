@@ -28,7 +28,7 @@ import scala.language.implicitConversions
 trait DefaultImplicits extends Implicits { 
   //self: Analyzer =>
   self: Globals with 
-  DefaultTypers with /* Because we extend DefaultTyper, we might use composition with `newTyper` instead */
+  Typers with
   Contexts with 
   DefaultContextErrors with 
   Macros with 
@@ -78,7 +78,8 @@ trait DefaultImplicits extends Implicits {
     if (shouldPrint)
       typingStack.printTyping(tree, "typing implicit: %s %s".format(tree, context.undetparamsString))
     val implicitSearchContext = context.makeImplicit(reportAmbiguous)
-    val result = new DefaultImplicitSearch(tree, pt, isView, implicitSearchContext, pos).bestImplicit
+    val typer = newTyper(implicitSearchContext)
+    val result = new DefaultImplicitSearch(tree, pt, isView, typer, pos).bestImplicit
 
     if (result.isFailure && saveAmbiguousDivergent && implicitSearchContext.reporter.hasErrors)
       implicitSearchContext.reporter.propagateImplicitTypeErrorsTo(context.reporter)
@@ -128,7 +129,8 @@ trait DefaultImplicits extends Implicits {
     val tvars = tpars map (TypeVar untouchable _)
     val tpSubsted = tp.subst(tpars, tvars)
 
-    val search = new DefaultImplicitSearch(EmptyTree, functionType(List(tpSubsted), AnyTpe), true, context.makeImplicit(reportAmbiguousErrors = false))
+    val typer = newTyper(context.makeImplicit(reportAmbiguousErrors = false))
+    val search = new DefaultImplicitSearch(EmptyTree, functionType(List(tpSubsted), AnyTpe), true, typer)
 
     search.allImplicitsPoly(tvars)
   }
@@ -307,7 +309,11 @@ trait DefaultImplicits extends Implicits {
    *                          (useful when we infer synthetic stuff and pass EmptyTree in the `tree` argument)
    *                          If it's set to NoPosition, then position-based services will use `tree.pos`
    */
-  class DefaultImplicitSearch(tree: Tree, pt: Type, isView: Boolean, context0: Context, pos0: Position = NoPosition) extends DefaultTyper(context0) with ImplicitSearch with ImplicitsContextErrors {
+  class DefaultImplicitSearch(tree: Tree, pt: Type, isView: Boolean, typer:Typer, pos0: Position = NoPosition) extends ImplicitSearch with ImplicitsContextErrors {
+    def context = typer.context
+    
+    import typer._
+    
     val searchId = implicitSearchId()
     private def typingLog(what: String, msg: => String) =
       typingStack.printTyping(tree, f"[search #$searchId] $what $msg")
