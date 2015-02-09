@@ -42,6 +42,9 @@ trait ContextErrors {
       private[typechecker] def UnapplyWithSingleArgError(tree: Tree):Unit
     }
     private[nsc] val TyperErrorGen:TyperErrorGenObject
+    
+    /* Used by Typers */
+    protected def internalMacroImplementationNotFoundMessage(name:Name):String
   }
   
   private[scala] trait InferencerContextErrors {

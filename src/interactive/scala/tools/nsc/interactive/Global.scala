@@ -44,19 +44,37 @@ trait CommentPreservingTypers extends DefaultTypers {
   override def resetDocComments() = {}
 }
 
-trait InteractiveAnalyzer extends DefaultAnalyzer  {
+trait InteractiveAnalyzer extends Analyzer 
+  /* Still need to do the ones below */
+  with DefaultNamers 
+  with DefaultNamesDefaults 
+  with DefaultImplicits 
+  with SyntheticMethods { 
+  self: DefaultContextErrors with 
+  ast.TreeDSL =>
 
     import global._
   
-    override def newTyper(context: Context): InteractiveTyper = new DefaultTyper(context) with InteractiveTyper
+    override def newTyper(context: Context, settings: TyperSettings = TyperSettings.Default): Typer = 
+      super.newTyper(context, settings.copy(
+        decorations = Some(newInteractiveTyperDecorations),
+        canAdaptConstantTypeToLiteral = false,
+        canTranslateEmptyListToNil = false
+      ))
+      
+    private def newInteractiveTyperDecorations(typer:Typer) = {
+      val interactiveTyper = new InteractiveTyper(typer)
+      TyperDecorations(
+        missingSelectErrorTreeHook = Some(interactiveTyper.missingSelectErrorTree)
+      )
+    }
   
     override def newNamer(context: Context): InteractiveNamer = new DefaultNamer(context) with InteractiveNamer
     
-    trait InteractiveTyper extends DefaultTyper {
+    private class InteractiveTyper(typer:Typer) {
+      import typer._
     
-      override def canAdaptConstantTypeToLiteral = false
-      override def canTranslateEmptyListToNil    = false
-      override def missingSelectErrorTree(tree: Tree, qual: Tree, name: Name): Tree = tree match {
+      def missingSelectErrorTree(`super.missingSelectErrorTree`: (Tree, Tree, Name) => Tree)(tree: Tree, qual: Tree, name: Name): Tree = tree match {
         case Select(_, _)             => treeCopy.Select(tree, qual, name)
         case SelectFromTypeTree(_, _) => treeCopy.SelectFromTypeTree(tree, qual, name)
       }
@@ -245,7 +263,7 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
 
   override lazy val analyzer = new {
     val global: Global.this.type = Global.this
-  } with InteractiveAnalyzer
+  } with InteractiveAnalyzer with DefaultAnalyzer
 
   private def cleanAllResponses() {
     cleanResponses(waitLoadedTypeResponses)
@@ -992,7 +1010,7 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
     case _ => tree.tpe
   }
 
-  import analyzer.{SearchResult, DefaultImplicitSearch}
+  import analyzer.{SearchResult, DefaultImplicitSearch, newTyper}
 
   private[interactive] def getScopeCompletion(pos: Position, response: Response[List[Member]]) {
     informIDE("getScopeCompletion" + pos)
@@ -1149,9 +1167,15 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
       //print("\nadd enrichment")
       val applicableViews: List[SearchResult] =
         if (ownerTpe.isErroneous) List()
-        else new DefaultImplicitSearch(
-          tree, functionType(List(ownerTpe), AnyTpe), isView = true,
-          context0 = context.makeImplicit(reportAmbiguousErrors = false)).allImplicits
+        else {
+          val typer = newTyper(context.makeImplicit(reportAmbiguousErrors = false))
+          new DefaultImplicitSearch(
+            tree, 
+            functionType(List(ownerTpe), AnyTpe), 
+            isView = true,
+            typer
+          ).allImplicits
+        }
       for (view <- applicableViews) {
         val vtree = viewApply(view)
         val vpre = stabilizedType(vtree)

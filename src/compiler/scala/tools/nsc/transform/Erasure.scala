@@ -14,11 +14,21 @@ import scala.reflect.internal.Mode._
 
 abstract class DefaultErasure extends AddInterfaces 
                           with Erasure
-                          with typechecker.DefaultAnalyzer
                           with TypingTransformers
                           with ast.TreeDSL
                           with TypeAdaptingTransformer
-{
+{ self :
+  // required by typechecker.Typers
+  //typechecker.Globals with
+  //typechecker.Contexts
+  typechecker.ContextErrors with
+  typechecker.Infer with
+  typechecker.Namers with
+  // required by typechecker.Contexts
+  //typechecker.ContextErrors with
+  typechecker.Implicits with
+  typechecker.NamesDefaults =>
+  
   import global._
   import definitions._
   import CODE._
@@ -395,7 +405,17 @@ abstract class DefaultErasure extends AddInterfaces
 
 // -------- erasure on trees ------------------------------------------
 
-  override def newTyper(context: Context) = new Eraser(context)
+  override def newTyper(context: Context, settings:TyperSettings = TyperSettings.Default): Typer =
+    super.newTyper(context, settings.copy(decorations = Some(newEraserDecorations)))
+
+  private def newEraserDecorations(self:Typer) = {
+    val eraser = new Eraser(self)
+    TyperDecorations(
+      typed1Hook = Some(eraser.typed1),
+      adaptHook = Some(eraser.adapt),
+      stabilizeHook = Some(eraser.stabilize)
+    )
+  }
 
   class ComputeBridges(unit: CompilationUnit, root: Symbol) {
     assert(phase == currentRun.erasurePhase, phase)
@@ -573,10 +593,11 @@ abstract class DefaultErasure extends AddInterfaces
   }
 
   /** The modifier typer which retypes with erased types. */
-  class Eraser(_context: Context) extends DefaultTyper(_context) with TypeAdapter {
-    val typer = this.asInstanceOf[analyzer.Typer]
-
-    override protected def stabilize(tree: Tree, pre: Type, mode: Mode, pt: Type): Tree = tree
+  class Eraser(_typer: Typer) extends TypeAdapter {
+    val typer:analyzer.Typer = _typer.asInstanceOf[analyzer.Typer]
+    import _typer._
+    
+    def stabilize(`super.stabilize`: (Tree, Type, Mode, Type) => Tree)(tree: Tree, pre: Type, mode: Mode, pt: Type): Tree = tree
 
     /**  Replace member references as follows:
      *
@@ -673,12 +694,12 @@ abstract class DefaultErasure extends AddInterfaces
 
     /** A replacement for the standard typer's adapt method.
      */
-    override protected def adapt(tree: Tree, mode: Mode, pt: Type, original: Tree = EmptyTree): Tree =
+    def adapt(`super.adapt`: (Tree, Mode, Type, Tree) => Tree)(tree: Tree, mode: Mode, pt: Type, original: Tree = EmptyTree): Tree =
       adaptToType(tree, pt)
 
     /** A replacement for the standard typer's `typed1` method.
      */
-    override def typed1(tree: Tree, mode: Mode, pt: Type): Tree = {
+    def typed1(`super.typed1`: (Tree, Mode, Type) => Tree)(tree: Tree, mode: Mode, pt: Type): Tree = {
       val tree1 = try {
         tree match {
           case InjectDerivedValue(arg) =>
@@ -693,7 +714,7 @@ abstract class DefaultErasure extends AddInterfaces
 
             }
           case _ =>
-            super.typed1(adaptMember(tree), mode, pt)
+            `super.typed1`(adaptMember(tree), mode, pt)
         }
       } catch {
         case er: TypeError =>

@@ -14,7 +14,7 @@ trait Analyzer extends Globals
   with StdAttachments
   with NamesDefaults
   with AnalyzerPlugins
-{  
+{
   def namerFactory:SubComponent
   def packageObjects:SubComponent
   def typerFactory:SubComponent

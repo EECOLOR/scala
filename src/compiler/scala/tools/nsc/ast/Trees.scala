@@ -15,12 +15,16 @@ import scala.reflect.internal.Flags.PARAMACCESSOR
 import scala.reflect.internal.Flags.PRESUPER
 import scala.reflect.internal.Flags.TRAIT
 import scala.compat.Platform.EOL
+import scala.tools.nsc.symtab.SymbolTable
 
-trait Trees extends scala.reflect.internal.Trees { self: Global =>
+trait Trees extends scala.reflect.internal.Trees { self: SymbolTable with DocComments with CompilationUnits =>
+  
+  def enteringErasure[T](op: => T): T
+
   // --- additional cases --------------------------------------------------------
   /** Only used during parsing */
   case class Parens(args: List[Tree]) extends Tree
-
+  
   /** Documented definition, eliminated by analyzer */
   case class DocDef(comment: DocComment, definition: Tree)
        extends Tree {
@@ -79,7 +83,9 @@ trait Trees extends scala.reflect.internal.Trees { self: Global =>
 
   object treeInfo extends {
     val global: Trees.this.type = self
-  } with TreeInfo
+  } with TreeInfo {
+    def enteringErasure[T](op: => T): T = self.enteringErasure(op)
+  }
 
   // --- additional cases in operations ----------------------------------
 

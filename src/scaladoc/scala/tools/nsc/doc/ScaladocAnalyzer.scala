@@ -7,28 +7,39 @@ package scala.tools.nsc
 package doc
 
 import scala.tools.nsc.ast.parser.{ SyntaxAnalyzer, BracePatch }
-import typechecker.DefaultAnalyzer
+import typechecker.Analyzer
 import scala.reflect.internal.Chars._
 import scala.reflect.internal.util.{ BatchSourceFile, Position }
 import scala.tools.nsc.doc.base.{ CommentFactoryBase, MemberLookupBase, LinkTo, LinkToExternal }
 
-trait ScaladocAnalyzer extends DefaultAnalyzer {
+trait ScaladocAnalyzer extends Analyzer {
   val global : Global // generally, a ScaladocGlobal
   import global._
 
-  override def newTyper(context: Context): ScaladocTyper = new DefaultTyper(context) with ScaladocTyper
+  override def newTyper(context: Context, settings: TyperSettings = TyperSettings.Default): Typer = 
+    super.newTyper(context, settings.copy(
+        decorations = Some(newScalaDocTyperDecorations),
+        canAdaptConstantTypeToLiteral = false))
 
-  trait ScaladocTyper extends DefaultTyper {
+  private def newScalaDocTyperDecorations(typer:Typer) = {
+    val scaladocTyper = new ScaladocTyper(typer)
+    TyperDecorations(
+      macroImplementationNotFoundMessageHook = Some(scaladocTyper.macroImplementationNotFoundMessage),
+      typedDocDefHook = Some(scaladocTyper.typedDocDef)
+    )
+  }
+    
+  private class ScaladocTyper(typer:Typer) {
+    import typer._
+    
     private def unit = context.unit
 
-    override def canAdaptConstantTypeToLiteral = false
-
-    override protected def macroImplementationNotFoundMessage(name: Name): String = (
-        super.macroImplementationNotFoundMessage(name)
+    def macroImplementationNotFoundMessage(`super.macroImplementationNotFoundMessage`: Name => String)(name: Name): String = (
+        `super.macroImplementationNotFoundMessage`(name)
       + "\nWhen generating scaladocs for multiple projects at once, consider using -Ymacro-no-expand to disable macro expansions altogether."
     )
 
-    override def typedDocDef(docDef: DocDef, mode: Mode, pt: Type): Tree = {
+    def typedDocDef(`super.typedDocDef`: (DocDef, Mode, Type) => Tree)(docDef: DocDef, mode: Mode, pt: Type): Tree = {
       val sym = docDef.symbol
 
       if ((sym ne null) && (sym ne NoSymbol)) {
@@ -49,7 +60,7 @@ trait ScaladocAnalyzer extends DefaultAnalyzer {
         }
       }
 
-      super.typedDocDef(docDef, mode, pt)
+      `super.typedDocDef`(docDef, mode, pt)
     }
 
     def defineUseCases(useCase: UseCase): List[Symbol] = {

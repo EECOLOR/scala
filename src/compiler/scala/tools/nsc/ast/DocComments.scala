@@ -6,15 +6,24 @@
 package scala.tools.nsc
 package ast
 
-import symtab._
 import util.DocStrings._
 import scala.collection.mutable
+import scala.tools.nsc.symtab.SymbolTable
+import scala.tools.nsc.symtab.Flags
+
+trait CorrectReporter {
+  // There is probably a bug in the compiler
+  // Defining it as just a method within DocComments still had any reference pointing
+  // to the one defined in SymbolTable. Might have something to do with SymbolTable
+  // being an abstract class.
+  def reporter: reporters.Reporter
+}
 
 /*
  *  @author  Martin Odersky
  *  @version 1.0
  */
-trait DocComments { self: Global =>
+trait DocComments { self: SymbolTable with CorrectReporter =>
 
   val cookedDocComments = mutable.HashMap[Symbol, String]()
 

@@ -26,6 +26,7 @@ import Mode._
  *  @author  Martin Odersky
  *  @version 1.0
  */
+
 trait DefaultTypers extends Typers with Adaptations with Tags with TypersTracking with PatternTypers with TypeDiagnostics with EtaExpansion {
   //self: Analyzer =>
   self: Globals with 
@@ -105,9 +106,10 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
 
   case class DefaultSilentResultValue[+T](value: T) extends DefaultSilentResult[T] with SilentResultValue[T] { override def isEmpty = false }
   
-  def newTyper(context: Context): DefaultTyper = new NormalTyper(context)
-
-  private class NormalTyper(context : Context) extends DefaultTyper(context)
+  def newTyperImplementation(context: Context, settings: TyperSettings): Typer = 
+    new NormalTyper(context, settings)
+  
+  private class NormalTyper(context: Context, settings: TyperSettings) extends DefaultTyper(context, settings)
 
   // A transient flag to mark members of anonymous classes
   // that are turned private by typedBlock
@@ -116,13 +118,51 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
   private final val InterpolatorCodeRegex  = """\$\{.*?\}""".r
   private final val InterpolatorIdentRegex = """\$[$\w]+""".r // note that \w doesn't include $
 
-  abstract class DefaultTyper(context0: Context) extends Typer with DefaultTyperDiagnostics with Adaptation with Tag with PatternTyper with DefaultTyperContextErrors {
+  private abstract class DefaultTyper(context0: Context, typerSettings:TyperSettings) extends Typer with DefaultTyperDiagnostics with Adaptation with Tag with PatternTyper with DefaultTyperContextErrors {
     import context0.unit
     import typeDebug.{ ptTree, ptBlock, ptLine, inGreen, inRed }
     import TyperErrorGen._
     val runDefinitions = currentRun.runDefinitions
     import runDefinitions._
-
+    
+    private val decorations = typerSettings.decorationsFor(this)
+    
+    def typed(tree: Tree, mode: Mode, pt: Type): Tree = {
+      val withHook = decorations.implement(_.typedHook)(internalTyped) 
+    	withHook(tree, mode, pt)
+    } 
+    def typed1(tree: Tree, mode: Mode, pt: Type): Tree = {
+      val withHook = decorations.implement(_.typed1Hook)(internalTyped1)
+      withHook(tree, mode, pt)
+    }
+    def finishMethodSynthesis(templ: Template, clazz: Symbol, context: Context): Template = {
+      val withHook = decorations.implement(_.finishMethodSynthesisHook)(internalFinishMethodSynthesis)
+      withHook(templ, clazz, context)
+    }
+    def adapt(tree: Tree, mode: Mode, pt: Type, original: Tree = EmptyTree): Tree = {
+      val withHook = decorations.implement(_.adaptHook)(internalAdapt)
+      withHook(tree, mode, pt, original)
+    }
+    def stabilize(tree: Tree, pre: Type, mode: Mode, pt: Type): Tree = {
+      val withHook = decorations.implement(_.stabilizeHook)(internalStabilize)
+      withHook(tree, pre, mode, pt)
+    }
+    def macroImplementationNotFoundMessage(name:Name):String = {
+      val withHook = decorations.implement(_.macroImplementationNotFoundMessageHook)(internalMacroImplementationNotFoundMessage)
+      withHook(name)
+    }
+    def typedDocDef(docDef: DocDef, mode: Mode, pt: Type): Tree = {
+      val withHook = decorations.implement(_.typedDocDefHook)(internalTypedDocDef)
+      withHook(docDef, mode, pt)
+    }
+    def missingSelectErrorTree(tree: Tree, qual: Tree, name: Name): Tree = {
+      val withHook = decorations.implement(_.missingSelectErrorTreeHook)(internalMissingSelectErrorTree)
+      withHook(tree, qual, name)
+    }
+    
+    private def newTyper(context: Context):DefaultTyper = 
+      new NormalTyper(context, typerSettings)
+    
     private val transformed: mutable.Map[Tree, Tree] = unit.transformed
 
     val infer:Inferencer = new DefaultInferencer {
@@ -132,11 +172,11 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
     }
 
     /** Overridden to false in scaladoc and/or interactive. */
-    def canAdaptConstantTypeToLiteral = true
-    def canTranslateEmptyListToNil    = true
-    def missingSelectErrorTree(tree: Tree, qual: Tree, name: Name): Tree = tree
+    def canAdaptConstantTypeToLiteral = typerSettings.canAdaptConstantTypeToLiteral
+    def canTranslateEmptyListToNil    = typerSettings.canTranslateEmptyListToNil
+    def internalMissingSelectErrorTree(tree: Tree, qual: Tree, name: Name): Tree = tree
 
-    def typedDocDef(docDef: DocDef, mode: Mode, pt: Type): Tree =
+    def internalTypedDocDef(docDef: DocDef, mode: Mode, pt: Type): Tree =
       typed(docDef.definition, mode, pt)
 
     /** Find implicit arguments and pass them to given tree.
@@ -574,7 +614,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
      *  3. Turn tree type into stable type if possible and required by context.
      *  4. Give getClass calls a more precise type based on the type of the target of the call.
      */
-    protected def stabilize(tree: Tree, pre: Type, mode: Mode, pt: Type): Tree = {
+    def internalStabilize(tree: Tree, pre: Type, mode: Mode, pt: Type): Tree = {
 
       // Side effect time! Don't be an idiot like me and think you
       // can move "val sym = tree.symbol" before this line, because
@@ -809,7 +849,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
      *  (14) When in mode EXPRmode, apply a view
      *  If all this fails, error
      */
-    protected def adapt(tree: Tree, mode: Mode, pt: Type, original: Tree = EmptyTree): Tree = {
+    private[typechecker] def internalAdapt(tree: Tree, mode: Mode, pt: Type, original: Tree = EmptyTree): Tree = {
       def hasUndets           = context.undetparams.nonEmpty
       def hasUndetsInMonoMode = hasUndets && !mode.inPolyMode
 
@@ -1847,7 +1887,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
      *  ...but it turns out it's also the ideal spot for namer/typer coordination for
      *  the tricky method synthesis scenarios, so we'll make it that.
      */
-    protected def finishMethodSynthesis(templ: Template, clazz: Symbol, context: Context): Template = {
+    protected def internalFinishMethodSynthesis(templ: Template, clazz: Symbol, context: Context): Template = {
       addSyntheticMethods(templ, clazz, context)
     }
     /** For flatMapping a list of trees when you want the DocDefs and Annotated
@@ -3912,7 +3952,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
     }
 
     // lifted out of typed1 because it's needed in typedImplicit0
-    protected def typedTypeApply(tree: Tree, mode: Mode, fun: Tree, args: List[Tree]): Tree = fun.tpe match {
+    private[typechecker] def typedTypeApply(tree: Tree, mode: Mode, fun: Tree, args: List[Tree]): Tree = fun.tpe match {
       case OverloadedType(pre, alts) =>
         inferPolyAlternatives(fun, mapList(args)(treeTpe))
 
@@ -4097,7 +4137,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
       def wrapErrors(tree: Tree, typeTree: Typer => Tree): Tree = silent(typeTree) orElse (err => DynamicRewriteError(tree, err.head))
     }
 
-    def typed1(tree: Tree, mode: Mode, pt: Type): Tree = {
+    def internalTyped1(tree: Tree, mode: Mode, pt: Type): Tree = {
       // Lookup in the given class using the root mirror.
       def lookupInOwner(owner: Symbol, name: Name): Symbol =
         if (mode.inQualMode) rootMirror.missingHook(owner, name) else NoSymbol
@@ -5374,7 +5414,7 @@ trait DefaultTypers extends Typers with Adaptations with Tags with TypersTrackin
       }
     }
 
-    def typed(tree: Tree, mode: Mode, pt: Type): Tree = {
+    def internalTyped(tree: Tree, mode: Mode, pt: Type): Tree = {
       lastTreeToTyper = tree
       def body = (
         if (printTypings && !phase.erasedTypes && !noPrintTyping(tree))

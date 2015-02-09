@@ -12,6 +12,12 @@ trait Contexts {
     
   import global._
 
+  // Now this can be overridden in sub classes
+  protected def onTreeCheckerError(pos: Position, msg: String): Unit = 
+    onTreeCheckerErrorImplementation(pos, msg)
+  
+  protected def onTreeCheckerErrorImplementation(pos: Position, msg: String): Unit
+      
   def rootContext(unit: CompilationUnit, tree: Tree = EmptyTree, throwing: Boolean = false, checking: Boolean = false): Context
   
   private[nsc] def rootContextPostTyper(unit: CompilationUnit, tree: Tree = EmptyTree): Context
