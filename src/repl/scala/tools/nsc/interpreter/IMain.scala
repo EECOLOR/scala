@@ -124,7 +124,7 @@ class IMain(@BeanProperty val factory: ScriptEngineFactory, initialSettings: Set
   private def _initialize() = {
     try {
       // if this crashes, REPL will hang its head in shame
-      val run = new _compiler.Run()
+      val run = _compiler.newRun()
       assert(run.typerPhase != NoPhase, "REPL requires a typer phase.")
       run compileSources _initSources
       _initializeComplete = true
@@ -240,7 +240,7 @@ class IMain(@BeanProperty val factory: ScriptEngineFactory, initialSettings: Set
   protected def newCompiler(settings: Settings, reporter: reporters.Reporter): ReplGlobal = {
     settings.outputDirs setSingleOutput replOutput.dir
     settings.exposeEmptyPackage.value = true
-    new Global(settings, reporter) with ReplGlobal { override def toString: String = "<global>" }
+    new DefaultGlobal(settings, reporter) with ReplGlobal { override def toString: String = "<global>" }
   }
 
   /**
@@ -250,7 +250,7 @@ class IMain(@BeanProperty val factory: ScriptEngineFactory, initialSettings: Set
    * @param urls The list of items to add to the compile and runtime classpaths.
    */
   def addUrlsToClassPath(urls: URL*): Unit = {
-    new Run //  force some initialization
+    newRun //  force some initialization
     urls.foreach(_runtimeClassLoader.addURL) // Add jars to runtime classloader
     global.extendCompilerClassPath(urls: _*) // Add jars to compile-time classpath
   }
@@ -419,7 +419,7 @@ class IMain(@BeanProperty val factory: ScriptEngineFactory, initialSettings: Set
   }
 
   def compileSourcesKeepingRun(sources: SourceFile*) = {
-    val run = new Run()
+    val run = newRun()
     assert(run.typerPhase != NoPhase, "REPL requires a typer phase.")
     reporter.reset()
     run compileSources sources.toList

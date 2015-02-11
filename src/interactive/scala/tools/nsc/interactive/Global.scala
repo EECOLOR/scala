@@ -141,7 +141,7 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
    */
   private var initializing = true
   override val useOffsetPositions = false
-} with scala.tools.nsc.Global(settings, _reporter)
+} with scala.tools.nsc.DefaultGlobal(settings, _reporter)
   with CompilerControl
   with ContextTrees
   with RichCompilationUnits
@@ -1245,7 +1245,7 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
   // ---------------- Helper classes ---------------------------
 
   /** The typer run */
-  class TyperRun extends Run {
+  class TyperRun extends DefaultRun {
     // units is always empty
 
     /** canRedefine is used to detect double declarations of classes and objects

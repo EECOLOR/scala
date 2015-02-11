@@ -36,8 +36,8 @@ class StandardCompileServer(fixPort: Int = 0) extends SocketServer(fixPort) {
   import runtime.{ totalMemory, freeMemory, maxMemory }
 
   /** Create a new compiler instance */
-  def newGlobal(settings: Settings, reporter: Reporter) =
-    new Global(settings, reporter) {
+  def newGlobal(settings: Settings, reporter: Reporter):Global =
+    new DefaultGlobal(settings, reporter) {
       override def inform(pos: Position, msg: String) = out.println(msg)
     }
 
@@ -146,7 +146,7 @@ class StandardCompileServer(fixPort: Int = 0) extends SocketServer(fixPort) {
         compiler = newGlobal(newSettings, reporter)
       }
       val c = compiler
-      try new c.Run() compile command.files
+      try c.newRun() compile command.files
       catch {
         case ex @ FatalError(msg) =>
           reporter.error(null, "fatal error: " + msg)

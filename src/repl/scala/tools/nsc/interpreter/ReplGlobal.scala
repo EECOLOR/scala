@@ -72,7 +72,7 @@ trait ReplGlobal extends Global {
     override val requires = List("typer")  // ensure they didn't -Ystop-after:parser
   }
 
-  override protected def computePhaseDescriptors: List[SubComponent] = {
+  abstract override protected def computePhaseDescriptors: List[SubComponent] = {
     addToPhasesSet(replPhase, "repl")
     super.computePhaseDescriptors
   }

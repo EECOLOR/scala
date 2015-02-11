@@ -15,7 +15,8 @@ import scala.reflect.internal.util.StringOps.countElementsAsString
  *
  * TODO: make reporting configurable
  */
-trait Reporting extends scala.reflect.internal.Reporting { self: ast.Positions with CompilationUnits with scala.reflect.internal.Symbols =>
+trait Reporting extends scala.reflect.internal.Reporting { 
+  self: ast.Positions with CompilationUnits with scala.reflect.internal.Symbols =>
   def settings: Settings
 
   // not deprecated yet, but a method called "error" imported into

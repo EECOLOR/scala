@@ -41,9 +41,9 @@ class DocFactory(val reporter: Reporter, val settings: doc.Settings) { processor
     assert(settings.docformat.value == "html")
     source match {
       case Left(files) =>
-        new compiler.Run() compile files
+        compiler.newRun() compile files
       case Right(sourceCode) =>
-        new compiler.Run() compileSources List(new BatchSourceFile("newSource", sourceCode))
+        compiler.newRun() compileSources List(new BatchSourceFile("newSource", sourceCode))
     }
 
     if (reporter.hasErrors)

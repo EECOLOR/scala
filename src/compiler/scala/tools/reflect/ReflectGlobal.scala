@@ -1,7 +1,7 @@
 package scala.tools
 package reflect
 
-import scala.tools.nsc.Global
+import scala.tools.nsc.DefaultGlobal
 import scala.tools.nsc.reporters.Reporter
 import scala.tools.nsc.Settings
 
@@ -9,7 +9,7 @@ import scala.tools.nsc.Settings
  *  infos, instead of reading class or source files.
  */
 class ReflectGlobal(currentSettings: Settings, reporter: Reporter, override val rootClassLoader: ClassLoader)
-  extends Global(currentSettings, reporter) with scala.tools.reflect.ReflectSetup with scala.reflect.runtime.SymbolTable {
+  extends DefaultGlobal(currentSettings, reporter) with scala.tools.reflect.ReflectSetup with scala.reflect.runtime.SymbolTable {
 
   override def transformedType(sym: Symbol) =
     postErasure.transformInfo(sym,

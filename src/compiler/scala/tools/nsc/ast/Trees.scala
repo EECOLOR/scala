@@ -17,7 +17,8 @@ import scala.reflect.internal.Flags.TRAIT
 import scala.compat.Platform.EOL
 import scala.tools.nsc.symtab.SymbolTable
 
-trait Trees extends scala.reflect.internal.Trees { self: SymbolTable with DocComments with CompilationUnits =>
+trait Trees extends scala.reflect.internal.Trees { 
+  self: SymbolTable with DocComments with CompilationUnits =>
   
   def enteringErasure[T](op: => T): T
 

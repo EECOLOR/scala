@@ -37,7 +37,7 @@ trait ScaladocGlobalTrait extends Global {
   }
 }
 
-class ScaladocGlobal(settings: doc.Settings, reporter: Reporter) extends Global(settings, reporter) with ScaladocGlobalTrait {
+class ScaladocGlobal(settings: doc.Settings, reporter: Reporter) extends DefaultGlobal(settings, reporter) with ScaladocGlobalTrait {
   override protected def computeInternalPhases() {
     phasesSet += syntaxAnalyzer
     phasesSet += analyzer.namerFactory

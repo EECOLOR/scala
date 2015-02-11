@@ -1,6 +1,8 @@
 package scala.tools.nsc
 package ast
 
+import scala.tools.nsc.symtab.SymbolTable
+
 trait Positions extends scala.reflect.internal.Positions {
   self: Global =>
 
