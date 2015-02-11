@@ -18,7 +18,7 @@ trait MatchTranslation {
   import PatternMatchingStats._
   import global._
   import definitions._
-  import global.analyzer.{ErrorUtils, formalTypes}
+  import global.analyzer.formalTypes
   import treeInfo.{ WildcardStarArg, Unapplied, isStar, unbind }
   import CODE._
 

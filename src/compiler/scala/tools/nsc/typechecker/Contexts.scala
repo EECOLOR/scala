@@ -15,15 +15,23 @@ import scala.tools.nsc.reporters.Reporter
  *  @author  Martin Odersky
  *  @version 1.0
  */
-trait Contexts { self: Analyzer =>
+trait DefaultContexts extends Contexts { 
+  //self: Analyzer =>
+  self:
+  Globals with
+  Implicits with 
+  NamesDefaults with 
+  DefaultContextErrors with 
+  Namers =>
+    
   import global._
   import definitions.{ JavaLangPackage, ScalaPackage, PredefModule, ScalaXmlTopScope, ScalaXmlPackage }
   import ContextMode._
 
-  protected def onTreeCheckerError(pos: Position, msg: String): Unit = ()
+  protected def onTreeCheckerErrorImplementation(pos: Position, msg: String): Unit = ()
 
   object NoContext
-    extends Context(EmptyTree, NoSymbol, EmptyScope, NoCompilationUnit,
+    extends DefaultContext(EmptyTree, NoSymbol, EmptyScope, NoCompilationUnit,
                     null) { // We can't pass the uninitialized `this`. Instead, we treat null specially in `Context#outer`
     enclClass  = this
     enclMethod = this
@@ -181,11 +189,11 @@ trait Contexts { self: Analyzer =>
    * @param scope The current scope
    * @param _outer The next outer context.
    */
-  class Context private[typechecker](val tree: Tree, val owner: Symbol, val scope: Scope,
-                                     val unit: CompilationUnit, _outer: Context,
-                                     private[this] var _reporter: ContextReporter = new ThrowingReporter) {
+  class DefaultContext private[typechecker](val tree: Tree, val owner: Symbol, val scope: Scope,
+                                     val unit: CompilationUnit, _outer: DefaultContext,
+                                     private[this] var _reporter: ContextReporter = new ThrowingReporter) extends Context {
     private def outerIsNoContext = _outer eq null
-    final def outer: Context = if (outerIsNoContext) NoContext else _outer
+    final def outer: DefaultContext = if (outerIsNoContext) NoContext else _outer
 
     /** The next outer context whose tree is a template or package definition */
     var enclClass: Context = _
@@ -214,7 +222,7 @@ trait Contexts { self: Analyzer =>
     def apply(mask: ContextMode): Boolean = contextMode.inAll(mask)
 
     /** The next outer context whose tree is a method */
-    var enclMethod: Context = _
+    var enclMethod: DefaultContext = _
 
     /** Variance relative to enclosing class */
     var variance: Variance = Variance.Invariant
@@ -341,10 +349,7 @@ trait Contexts { self: Analyzer =>
      * Try inference twice: once without views and once with views,
      *  unless views are already disabled.
      */
-    abstract class TryTwice {
-      def tryOnce(isLastTry: Boolean): Unit
-
-      final def apply(): Unit = {
+    def tryTwice(tryOnce: Boolean => Unit):Unit = {
         val doLastTry =
           // do first try if implicits are enabled
           if (implicitsEnabled) {
@@ -370,7 +375,6 @@ trait Contexts { self: Analyzer =>
         // (or if it was not attempted because they were disabled)
         if (doLastTry)
           tryOnce(true)
-      }
     }
 
     //
@@ -439,7 +443,7 @@ trait Contexts { self: Analyzer =>
      */
     def make(tree: Tree = tree, owner: Symbol = owner,
              scope: Scope = scope, unit: CompilationUnit = unit,
-             reporter: ContextReporter = this.reporter): Context = {
+             reporter: ContextReporter = this.reporter): DefaultContext = {
       val isTemplateOrPackage = tree match {
         case _: Template | _: PackageDef => true
         case _                           => false
@@ -462,9 +466,9 @@ trait Contexts { self: Analyzer =>
 
       // The blank canvas
       val c = if (isImport)
-        new Context(tree, owner, scope, unit, this, reporter) with ImportContext
+        new DefaultContext(tree, owner, scope, unit, this, reporter) with ImportContext
       else
-        new Context(tree, owner, scope, unit, this, reporter)
+        new DefaultContext(tree, owner, scope, unit, this, reporter)
 
       // Fields that are directly propagated
       c.variance           = variance
@@ -804,7 +808,7 @@ trait Contexts { self: Analyzer =>
 
     private def collectImplicits(syms: Scope, pre: Type, imported: Boolean = false): List[ImplicitInfo] =
       for (sym <- syms.toList if isQualifyingImplicit(sym.name, sym, pre, imported)) yield
-        new ImplicitInfo(sym.name, pre, sym)
+        newImplicitInfo(sym.name, pre, sym)
 
     private def collectImplicitImports(imp: ImportInfo): List[ImplicitInfo] = {
       val qual = imp.qual
@@ -825,7 +829,7 @@ trait Contexts { self: Analyzer =>
           if (to != nme.WILDCARD) {
             for (sym <- importedAccessibleSymbol(imp, to).alternatives)
               if (isQualifyingImplicit(to, sym, pre, imported = true))
-                impls = new ImplicitInfo(to, pre, sym) :: impls
+                impls = newImplicitInfo(to, pre, sym) :: impls
           }
           impls
       }
@@ -1091,7 +1095,7 @@ trait Contexts { self: Analyzer =>
         symbolDepth = cx.depth
 
       var impSym: Symbol = NoSymbol
-      var imports        = Context.this.imports
+      var imports        = DefaultContext.this.imports
       def imp1           = imports.head
       def imp2           = imports.tail.head
       def sameDepth      = imp1.depth == imp2.depth
@@ -1211,9 +1215,9 @@ trait Contexts { self: Analyzer =>
   } //class Context
 
   /** A `Context` focussed on an `Import` tree */
-  trait ImportContext extends Context {
+  trait ImportContext extends DefaultContext {
     private val impInfo: ImportInfo = {
-      val info = new ImportInfo(tree.asInstanceOf[Import], outerDepth)
+      val info = new DefaultImportInfo(tree.asInstanceOf[Import], outerDepth)
       if (settings.warnUnusedImport && !isRootImport) // excludes java.lang/scala/Predef imports
         allImportInfos(unit) ::= info
       info
@@ -1235,7 +1239,7 @@ trait Contexts { self: Analyzer =>
    *
    *  To handle nested contexts, reporters share buffers. TODO: only buffer in BufferingReporter, emit immediately in ImmediateReporter
    */
-  abstract class ContextReporter(private[this] var _errorBuffer: mutable.LinkedHashSet[AbsTypeError] = null, private[this] var _warningBuffer: mutable.LinkedHashSet[(Position, String)] = null) extends Reporter {
+  abstract class DefaultContextReporter(private[this] var _errorBuffer: mutable.LinkedHashSet[AbsTypeError] = null, private[this] var _warningBuffer: mutable.LinkedHashSet[(Position, String)] = null) extends Reporter with ContextReporter {
     type Error = AbsTypeError
     type Warning = (Position, String)
 
@@ -1344,7 +1348,7 @@ trait Contexts { self: Analyzer =>
     // [JZ] Contexts, pre- the SI-7345 refactor, avoided allocating the buffers until needed. This
     // is replicated here out of conservatism.
     private def newBuffer[A]    = mutable.LinkedHashSet.empty[A] // Important to use LinkedHS for stable results.
-    final protected def errorBuffer   = { if (_errorBuffer == null) _errorBuffer = newBuffer; _errorBuffer }
+    final private[typechecker] def errorBuffer   = { if (_errorBuffer == null) _errorBuffer = newBuffer; _errorBuffer }
     final protected def warningBuffer = { if (_warningBuffer == null) _warningBuffer = newBuffer; _warningBuffer }
 
     final def errors: immutable.Seq[Error]     = errorBuffer.toVector
@@ -1360,13 +1364,13 @@ trait Contexts { self: Analyzer =>
     final def clearAllErrors(): Unit = { _errorBuffer = null }
   }
 
-  private[typechecker] class ImmediateReporter(_errorBuffer: mutable.LinkedHashSet[AbsTypeError] = null, _warningBuffer: mutable.LinkedHashSet[(Position, String)] = null) extends ContextReporter(_errorBuffer, _warningBuffer) {
+  private[typechecker] class ImmediateReporter(_errorBuffer: mutable.LinkedHashSet[AbsTypeError] = null, _warningBuffer: mutable.LinkedHashSet[(Position, String)] = null) extends DefaultContextReporter(_errorBuffer, _warningBuffer) {
     override def makeBuffering: ContextReporter = new BufferingReporter(errorBuffer, warningBuffer)
     protected def handleError(pos: Position, msg: String): Unit = reporter.error(pos, msg)
  }
 
 
-  private[typechecker] class BufferingReporter(_errorBuffer: mutable.LinkedHashSet[AbsTypeError] = null, _warningBuffer: mutable.LinkedHashSet[(Position, String)] = null) extends ContextReporter(_errorBuffer, _warningBuffer) {
+  private[typechecker] class BufferingReporter(_errorBuffer: mutable.LinkedHashSet[AbsTypeError] = null, _warningBuffer: mutable.LinkedHashSet[(Position, String)] = null) extends DefaultContextReporter(_errorBuffer, _warningBuffer) {
     override def isBuffering = true
 
     override def issue(err: AbsTypeError)(implicit context: Context): Unit             = errorBuffer += err
@@ -1385,18 +1389,18 @@ trait Contexts { self: Analyzer =>
    *
    * TODO: get rid of it, use ImmediateReporter and a check for reporter.hasErrors where necessary
    */
-  private[typechecker] class ThrowingReporter extends ContextReporter {
+  private[typechecker] class ThrowingReporter extends DefaultContextReporter {
     override def isThrowing = true
     protected def handleError(pos: Position, msg: String): Unit = throw new TypeError(pos, msg)
   }
 
   /** Used during a run of [[scala.tools.nsc.typechecker.TreeCheckers]]? */
-  private[typechecker] class CheckingReporter extends ContextReporter {
+  private[typechecker] class CheckingReporter extends DefaultContextReporter {
     protected def handleError(pos: Position, msg: String): Unit = onTreeCheckerError(pos, msg)
   }
 
 
-  class ImportInfo(val tree: Import, val depth: Int) {
+  class DefaultImportInfo(val tree: Import, val depth: Int) extends ImportInfo {
     def pos = tree.pos
     def posOf(sel: ImportSelector) = tree.pos withPoint sel.namePos
 

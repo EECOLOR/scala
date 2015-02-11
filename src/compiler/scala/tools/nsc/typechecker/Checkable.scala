@@ -63,8 +63,11 @@ import scala.language.postfixOps
  *  like from the point of view of one of its base classes, we ask what it looks
  *  like from the point of view of one of its subclasses.
  */
-trait Checkable {
-  self: Analyzer =>
+private[typechecker] trait Checkable {
+  //self: Analyzer =>
+  self: Globals with 
+  Infer with
+  ContextErrors =>
 
   import global._
   import definitions._

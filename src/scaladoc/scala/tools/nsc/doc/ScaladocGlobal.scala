@@ -9,6 +9,7 @@ package doc
 import scala.tools.nsc.ast.parser.{ SyntaxAnalyzer, BracePatch }
 import reporters.Reporter
 import typechecker.Analyzer
+import typechecker.DefaultAnalyzer
 import scala.reflect.internal.util.{ BatchSourceFile, RangePosition }
 
 
@@ -36,7 +37,7 @@ trait ScaladocGlobalTrait extends Global {
   }
 }
 
-class ScaladocGlobal(settings: doc.Settings, reporter: Reporter) extends Global(settings, reporter) with ScaladocGlobalTrait {
+class ScaladocGlobal(settings: doc.Settings, reporter: Reporter) extends DefaultGlobal(settings, reporter) with ScaladocGlobalTrait {
   override protected def computeInternalPhases() {
     phasesSet += syntaxAnalyzer
     phasesSet += analyzer.namerFactory
@@ -46,5 +47,5 @@ class ScaladocGlobal(settings: doc.Settings, reporter: Reporter) extends Global(
   override def forScaladoc = true
   override lazy val analyzer = new {
     val global: ScaladocGlobal.this.type = ScaladocGlobal.this
-  } with ScaladocAnalyzer
+  } with ScaladocAnalyzer with DefaultAnalyzer
 }

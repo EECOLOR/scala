@@ -1,11 +1,11 @@
 package scala.reflect.macros
 package util
 
-import scala.tools.nsc.typechecker.Analyzer
+import scala.tools.nsc.Global
 
 trait Helpers {
-  self: Analyzer =>
-
+  val global:Global
+  
   import global._
   import definitions._
 

@@ -48,7 +48,7 @@ object Test extends InteractiveTest {
         val global: outer.type = outer
       } with doc.ScaladocAnalyzer with InteractiveAnalyzer {
         override def newTyper(context: Context): InteractiveTyper with ScaladocTyper =
-          new Typer(context) with InteractiveTyper with ScaladocTyper
+          new DefaultTyper(context) with InteractiveTyper with ScaladocTyper
       }
 
       def chooseLink(links: List[LinkTo]): LinkTo = links.head

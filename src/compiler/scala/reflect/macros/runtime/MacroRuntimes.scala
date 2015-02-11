@@ -3,9 +3,14 @@ package runtime
 
 import scala.reflect.internal.Flags._
 import scala.reflect.runtime.ReflectionUtils
+import scala.tools.nsc.typechecker
 
-trait MacroRuntimes extends JavaReflectionRuntimes {
-  self: scala.tools.nsc.typechecker.Analyzer =>
+trait DefaultMacroRuntimes extends MacroRuntimes with JavaReflectionRuntime {
+  //self: scala.tools.nsc.typechecker.Analyzer =>
+  self: typechecker.Globals with 
+  util.Traces with 
+  typechecker.AnalyzerPlugins with 
+  typechecker.Macros =>
 
   import global._
   import definitions._
@@ -48,7 +53,6 @@ trait MacroRuntimes extends JavaReflectionRuntimes {
 
   /** Abstracts away resolution of macro runtimes.
    */
-  type MacroRuntime = MacroArgs => Any
   class MacroRuntimeResolver(val macroDef: Symbol) extends JavaReflectionResolvers {
     val binding = loadMacroImplBinding(macroDef).get
     val isBundle = binding.isBundle

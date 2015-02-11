@@ -14,6 +14,7 @@ import symtab.Flags._
  *  fields, which are assigned to from constructors.
  */
 abstract class Constructors extends Statics with Transform with ast.TreeDSL {
+  
   import global._
   import definitions._
 
@@ -389,13 +390,13 @@ abstract class Constructors extends Statics with Transform with ast.TreeDSL {
         if (stat1 eq stat) {
           assert(ctorParams(genericClazz).length == constrInfo.constrParams.length)
           // this is just to make private fields public
-          (new specializeTypes.ImplementationAdapter(ctorParams(genericClazz), constrInfo.constrParams, null, true))(stat1)
+          (specializeTypes.newImplementationAdapter(ctorParams(genericClazz), constrInfo.constrParams, null, true))(stat1)
 
           val stat2 = rewriteArrayUpdate(stat1)
           // statements coming from the original class need retyping in the current context
           debuglog("retyping " + stat2)
 
-          val d = new specializeTypes.Duplicator(Map[Symbol, Type]())
+          val d:specializeTypes.Duplicator = specializeTypes.newDuplicator(Map[Symbol, Type]())
           d.retyped(localTyper.context1.asInstanceOf[d.Context],
                     stat2,
                     genericClazz,
@@ -529,7 +530,8 @@ abstract class Constructors extends Statics with Transform with ast.TreeDSL {
         !sym.isSetter
       )
 
-      private def possiblySpecialized(s: Symbol) = specializeTypes.specializedTypeVars(s).nonEmpty
+      private def possiblySpecialized(s: Symbol) = 
+        specializeTypes.specializedTypeVars(s).nonEmpty
 
       /*
        * whether `sym` denotes a param-accessor (ie a field) that fulfills all of:

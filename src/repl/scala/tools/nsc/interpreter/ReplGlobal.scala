@@ -6,7 +6,7 @@
 package scala.tools.nsc
 package interpreter
 
-import typechecker.Analyzer
+import typechecker.DefaultAnalyzer
 
 /** A layer on top of Global so I can guarantee some extra
  *  functionality for the repl.  It doesn't do much yet.
@@ -22,18 +22,31 @@ trait ReplGlobal extends Global {
 
   override lazy val analyzer = new {
     val global: ReplGlobal.this.type = ReplGlobal.this
-  } with Analyzer {
+  } with DefaultAnalyzer {
 
-    override protected def findMacroClassLoader(): ClassLoader = {
+    override def findMacroClassLoader(): ClassLoader = {
       val loader = super.findMacroClassLoader
       macroLogVerbose("macro classloader: initializing from a REPL classloader: %s".format(global.classPath.asURLs))
       val virtualDirectory = globalSettings.outputDirs.getSingleOutput.get
       new util.AbstractFileClassLoader(virtualDirectory, loader) {}
     }
 
-    override def newTyper(context: Context): Typer = new Typer(context) {
-      override def typed(tree: Tree, mode: Mode, pt: Type): Tree = {
-        val res = super.typed(tree, mode, pt)
+    override def newTyper(context: Context, settings:TyperSettings = TyperSettings.Default) = { 
+      super.newTyper(context, settings.copy(decorations = Some(newCustomTyperDecorations)))
+    }
+    
+    private def newCustomTyperDecorations(typer:Typer) = {
+      val customTyper = new CustomTyper(typer)
+      TyperDecorations(
+        typedHook = Some(customTyper.typed)    
+      )
+    }
+    
+    private class CustomTyper(typer:Typer) {
+      import typer._
+      
+      def typed(`super.typed`: (Tree, Mode, Type) => Tree)(tree: Tree, mode: Mode, pt: Type): Tree = {
+        val res = `super.typed`(tree, mode, pt)
         tree match {
           case Ident(name) if !tree.symbol.hasPackageFlag && !name.toString.startsWith("$") =>
             repldbg("typed %s: %s".format(name, res.tpe))
@@ -59,7 +72,7 @@ trait ReplGlobal extends Global {
     override val requires = List("typer")  // ensure they didn't -Ystop-after:parser
   }
 
-  override protected def computePhaseDescriptors: List[SubComponent] = {
+  abstract override protected def computePhaseDescriptors: List[SubComponent] = {
     addToPhasesSet(replPhase, "repl")
     super.computePhaseDescriptors
   }

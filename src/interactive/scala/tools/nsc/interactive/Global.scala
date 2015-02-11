@@ -13,7 +13,7 @@ import scala.tools.nsc.io.AbstractFile
 import scala.reflect.internal.util.{ SourceFile, BatchSourceFile, Position, NoPosition }
 import scala.tools.nsc.reporters._
 import scala.tools.nsc.symtab._
-import scala.tools.nsc.typechecker.Analyzer
+import scala.tools.nsc.typechecker._
 import symtab.Flags.{ACCESSOR, PARAMACCESSOR}
 import scala.annotation.{ elidable, tailrec }
 import scala.language.implicitConversions
@@ -26,77 +26,111 @@ import scala.util.control.Breaks._
  * being many and close between in this context).
  */
 
-trait CommentPreservingTypers extends Typers {
-  self: Analyzer =>
+trait CommentPreservingTypers extends DefaultTypers {
+  self: Globals with 
+  Implicits with  
+  Contexts with 
+  DefaultContextErrors with
+  Unapplies with
+  DefaultInfer with 
+  Macros with
+  Namers with 
+  AnalyzerPlugins with
+  StdAttachments with
+  SyntheticMethods with
+  NamesDefaults with
+  ast.TreeDSL =>
 
   override def resetDocComments() = {}
 }
 
-trait InteractiveAnalyzer extends Analyzer {
-  val global : Global
-  import global._
+trait InteractiveAnalyzer extends Analyzer 
+  /* Still need to do the ones below */
+  with DefaultNamers 
+  with DefaultNamesDefaults 
+  with DefaultImplicits 
+  with SyntheticMethods { 
+  self: DefaultContextErrors with 
+  ast.TreeDSL =>
 
-  override def newTyper(context: Context): InteractiveTyper = new Typer(context) with InteractiveTyper
-  override def newNamer(context: Context): InteractiveNamer = new Namer(context) with InteractiveNamer
-
-  trait InteractiveTyper extends Typer {
-    override def canAdaptConstantTypeToLiteral = false
-    override def canTranslateEmptyListToNil    = false
-    override def missingSelectErrorTree(tree: Tree, qual: Tree, name: Name): Tree = tree match {
-      case Select(_, _)             => treeCopy.Select(tree, qual, name)
-      case SelectFromTypeTree(_, _) => treeCopy.SelectFromTypeTree(tree, qual, name)
+    import global._
+  
+    override def newTyper(context: Context, settings: TyperSettings = TyperSettings.Default): Typer = 
+      super.newTyper(context, settings.copy(
+        decorations = Some(newInteractiveTyperDecorations),
+        canAdaptConstantTypeToLiteral = false,
+        canTranslateEmptyListToNil = false
+      ))
+      
+    private def newInteractiveTyperDecorations(typer:Typer) = {
+      val interactiveTyper = new InteractiveTyper(typer)
+      TyperDecorations(
+        missingSelectErrorTreeHook = Some(interactiveTyper.missingSelectErrorTree)
+      )
     }
-  }
-
-  trait InteractiveNamer extends Namer {
-    override def saveDefaultGetter(meth: Symbol, default: Symbol) {
-      // save the default getters as attachments in the method symbol. if compiling the
-      // same local block several times (which can happen in interactive mode) we might
-      // otherwise not find the default symbol, because the second time it the method
-      // symbol will be re-entered in the scope but the default parameter will not.
-      meth.attachments.get[DefaultsOfLocalMethodAttachment] match {
-        case Some(att) => att.defaultGetters += default
-        case None      => meth.updateAttachment(new DefaultsOfLocalMethodAttachment(default))
+  
+    override def newNamer(context: Context): InteractiveNamer = new DefaultNamer(context) with InteractiveNamer
+    
+    private class InteractiveTyper(typer:Typer) {
+      import typer._
+    
+      def missingSelectErrorTree(`super.missingSelectErrorTree`: (Tree, Tree, Name) => Tree)(tree: Tree, qual: Tree, name: Name): Tree = tree match {
+        case Select(_, _)             => treeCopy.Select(tree, qual, name)
+        case SelectFromTypeTree(_, _) => treeCopy.SelectFromTypeTree(tree, qual, name)
       }
     }
-    // this logic is needed in case typer was interrupted half
-    // way through and then comes back to do the tree again. In
-    // that case the definitions that were already attributed as
-    // well as any default parameters of such methods need to be
-    // re-entered in the current scope.
-    //
-    // Tested in test/files/presentation/t8941b
-    override def enterExistingSym(sym: Symbol, tree: Tree): Context = {
-      if (sym != null && sym.owner.isTerm) {
-        enterIfNotThere(sym)
-        if (sym.isLazy)
-          sym.lazyAccessor andAlso enterIfNotThere
-
-        for (defAtt <- sym.attachments.get[DefaultsOfLocalMethodAttachment])
-          defAtt.defaultGetters foreach enterIfNotThere
-      } else if (sym != null && sym.isClass && sym.isImplicit) {
-        val owningInfo = sym.owner.info
-        val existingDerivedSym = owningInfo.decl(sym.name.toTermName).filter(sym => sym.isSynthetic && sym.isMethod)
-        existingDerivedSym.alternatives foreach (owningInfo.decls.unlink)
-        val defTree = tree match {
-          case dd: DocDef => dd.definition // See SI-9011, Scala IDE's presentation compiler incorporates ScalaDocGlobal with InterativeGlobal, so we have to unwrap DocDefs.
-          case _ => tree
+  
+    trait InteractiveNamer extends DefaultNamer {
+        
+      override def saveDefaultGetter(meth: Symbol, default: Symbol) {
+        // save the default getters as attachments in the method symbol. if compiling the
+        // same local block several times (which can happen in interactive mode) we might
+        // otherwise not find the default symbol, because the second time it the method
+        // symbol will be re-entered in the scope but the default parameter will not.
+        meth.attachments.get[DefaultsOfLocalMethodAttachment] match {
+          case Some(att) => att.defaultGetters += default
+          case None      => meth.updateAttachment(new DefaultsOfLocalMethodAttachment(default))
         }
-        enterImplicitWrapper(defTree.asInstanceOf[ClassDef])
       }
-      super.enterExistingSym(sym, tree)
-    }
-    override def enterIfNotThere(sym: Symbol) {
-      val scope = context.scope
-      @tailrec def search(e: ScopeEntry) {
-        if ((e eq null) || (e.owner ne scope))
-          scope enter sym
-        else if (e.sym ne sym)  // otherwise, aborts since we found sym
-          search(e.tail)
+      // this logic is needed in case typer was interrupted half
+      // way through and then comes back to do the tree again. In
+      // that case the definitions that were already attributed as
+      // well as any default parameters of such methods need to be
+      // re-entered in the current scope.
+      //
+      // Tested in test/files/presentation/t8941b
+      override def enterExistingSym(sym: Symbol, tree: Tree): Context = {
+        if (sym != null && sym.owner.isTerm) {
+          enterIfNotThere(sym)
+          if (sym.isLazy)
+            sym.lazyAccessor andAlso enterIfNotThere
+  
+          for (defAtt <- sym.attachments.get[DefaultsOfLocalMethodAttachment])
+            defAtt.defaultGetters foreach enterIfNotThere
+        } else if (sym != null && sym.isClass && sym.isImplicit) {
+          val owningInfo = sym.owner.info
+          val existingDerivedSym = owningInfo.decl(sym.name.toTermName).filter(sym => sym.isSynthetic && sym.isMethod)
+          existingDerivedSym.alternatives foreach (owningInfo.decls.unlink)
+          val defTree = tree match {
+            case dd: DocDef => dd.definition // See SI-9011, Scala IDE's presentation compiler incorporates ScalaDocGlobal with InterativeGlobal, so we have to unwrap DocDefs.
+            case _ => tree
+          }
+          enterImplicitWrapper(defTree.asInstanceOf[ClassDef])
+        }
+        super.enterExistingSym(sym, tree)
       }
-      search(scope lookupEntry sym.name)
+      override def enterIfNotThere(sym: Symbol) {
+        val scope = context.scope
+        @tailrec def search(e: ScopeEntry) {
+          if ((e eq null) || (e.owner ne scope))
+            scope enter sym
+          else if (e.sym ne sym)  // otherwise, aborts since we found sym
+            search(e.tail)
+        }
+        search(scope lookupEntry sym.name)
+      }
     }
-  }
+  
 }
 
 /** The main class of the presentation compiler in an interactive environment such as an IDE
@@ -107,7 +141,7 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
    */
   private var initializing = true
   override val useOffsetPositions = false
-} with scala.tools.nsc.Global(settings, _reporter)
+} with scala.tools.nsc.DefaultGlobal(settings, _reporter)
   with CompilerControl
   with ContextTrees
   with RichCompilationUnits
@@ -229,7 +263,7 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
 
   override lazy val analyzer = new {
     val global: Global.this.type = Global.this
-  } with InteractiveAnalyzer
+  } with InteractiveAnalyzer with DefaultAnalyzer
 
   private def cleanAllResponses() {
     cleanResponses(waitLoadedTypeResponses)
@@ -976,7 +1010,7 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
     case _ => tree.tpe
   }
 
-  import analyzer.{SearchResult, ImplicitSearch}
+  import analyzer.{SearchResult, DefaultImplicitSearch, newTyper}
 
   private[interactive] def getScopeCompletion(pos: Position, response: Response[List[Member]]) {
     informIDE("getScopeCompletion" + pos)
@@ -1133,9 +1167,15 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
       //print("\nadd enrichment")
       val applicableViews: List[SearchResult] =
         if (ownerTpe.isErroneous) List()
-        else new ImplicitSearch(
-          tree, functionType(List(ownerTpe), AnyTpe), isView = true,
-          context0 = context.makeImplicit(reportAmbiguousErrors = false)).allImplicits
+        else {
+          val typer = newTyper(context.makeImplicit(reportAmbiguousErrors = false))
+          new DefaultImplicitSearch(
+            tree, 
+            functionType(List(ownerTpe), AnyTpe), 
+            isView = true,
+            typer
+          ).allImplicits
+        }
       for (view <- applicableViews) {
         val vtree = viewApply(view)
         val vpre = stabilizedType(vtree)
@@ -1205,7 +1245,7 @@ class Global(settings: Settings, _reporter: Reporter, projectName: String = "") 
   // ---------------- Helper classes ---------------------------
 
   /** The typer run */
-  class TyperRun extends Run {
+  class TyperRun extends DefaultRun {
     // units is always empty
 
     /** canRedefine is used to detect double declarations of classes and objects

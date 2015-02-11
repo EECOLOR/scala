@@ -8,9 +8,13 @@ package scala.tools.nsc
 import scala.reflect.internal.util.{ SourceFile, NoSourceFile, FreshNameCreator }
 import scala.collection.mutable
 import scala.collection.mutable.{ LinkedHashSet, ListBuffer }
+import scala.tools.nsc.symtab.SymbolTable
+import scala.tools.nsc.backend.icode.ICodes
 
-trait CompilationUnits { global: Global =>
+trait CompilationUnits { global:SymbolTable =>
 
+  val icodes:ICodes
+  
   /** An object representing a missing compilation unit.
    */
   object NoCompilationUnit extends CompilationUnit(NoSourceFile) {
@@ -131,8 +135,8 @@ trait CompilationUnits { global: Global =>
 
     @deprecated("Call global.currentRun.reporting.deprecationWarning directly instead.", "2.11.2")
     final def deprecationWarning(pos: Position, msg: String): Unit = currentRun.reporting.deprecationWarning(pos, msg)
-    @deprecated("Call global.currentRun.reporting.uncheckedWarning directly instead.", "2.11.2")
-    final def uncheckedWarning(pos: Position, msg: String): Unit   = currentRun.reporting.uncheckedWarning(pos, msg)
+    //@deprecated("Call global.currentRun.reporting.uncheckedWarning directly instead.", "2.11.2")
+    //final def uncheckedWarning(pos: Position, msg: String): Unit   = currentRun.reporting.uncheckedWarning(pos, msg)
 
     @deprecated("This method will be removed. It does nothing.", "2.11.2")
     final def comment(pos: Position, msg: String): Unit = {}

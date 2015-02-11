@@ -32,7 +32,7 @@ class ForeignCompiler {
   private lazy val nsc: Global = {
     try {
       val command = new CompilerCommand(args.toList, settings)
-      new Global(command.settings, reporter)
+      new DefaultGlobal(command.settings, reporter)
     }
     catch {
       case ex @ FatalError(msg) =>
@@ -42,7 +42,7 @@ class ForeignCompiler {
 
   def compile(files: Array[File]): Int = {
     val command = new CompilerCommand(files.toList map (_.toString), settings)
-    (new nsc.Run) compile command.files
+    nsc.newRun compile command.files
     reporter.ERROR.count << 16 | reporter.WARNING.count
   }
 

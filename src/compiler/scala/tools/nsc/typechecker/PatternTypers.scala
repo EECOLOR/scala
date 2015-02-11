@@ -32,8 +32,15 @@ import Mode._
  *    object Foo { def unapplySeq(x: Any): Option[(Int, Int, Seq[Int])] }
  */
 
-trait PatternTypers {
-  self: Analyzer =>
+private[typechecker] trait PatternTypers {
+  //self: Analyzer =>
+  self: Globals with 
+  Typers with
+  Contexts with
+  ContextErrors with
+  Unapplies with
+  Infer with 
+  Macros =>
 
   import global._
   import definitions._
@@ -309,6 +316,7 @@ trait PatternTypers {
         // the union of the expected type and the inferred type of the argument to unapply
         val glbType        = glb(ensureFullyDefined(pt) :: unapplyArg.tpe_* :: Nil)
         val wrapInTypeTest = canRemedy && !(fun1.symbol.owner isNonBottomSubClass ClassTagClass)
+        import patmat.AlignedOps
         val formals        = patmat.alignPatterns(context.asInstanceOf[analyzer.Context], fun1, args).unexpandedFormals
         val args1          = typedArgsForFormals(args, formals, mode)
         val result         = UnApply(fun1, args1) setPos tree.pos setType glbType

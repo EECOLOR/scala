@@ -28,7 +28,7 @@ abstract class Driver {
       reporter.echo(command.usageMsg)
       reporter.echo(compiler.pluginOptionsHelp)
     } else {
-      val run = new compiler.Run()
+      val run = compiler.newRun()
       run compile command.files
       reporter.printSummary()
     }

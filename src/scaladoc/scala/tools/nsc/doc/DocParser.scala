@@ -15,12 +15,12 @@ import DocParser.Parsed
  *  right after parsing so it can read `DocDefs` from source code which would
  *  otherwise cause the compiler to go haywire.
  */
-class DocParser(settings: nsc.Settings, reporter: Reporter) extends Global(settings, reporter) with ScaladocGlobalTrait {
+class DocParser(settings: nsc.Settings, reporter: Reporter) extends DefaultGlobal(settings, reporter) with ScaladocGlobalTrait {
   def this(settings: Settings) = this(settings, new ConsoleReporter(settings))
   def this() = this(new Settings(Console println _))
 
   // the usual global initialization
-  locally { new Run() }
+  locally { newRun() }
 
   override def forScaladoc = true
   override protected def computeInternalPhases() {

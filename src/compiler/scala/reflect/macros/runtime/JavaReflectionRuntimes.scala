@@ -6,8 +6,9 @@ import scala.reflect.macros.blackbox.{Context => BlackboxContext}
 import scala.reflect.macros.whitebox.{Context => WhiteboxContext}
 import java.lang.reflect.{Constructor => jConstructor}
 
-trait JavaReflectionRuntimes {
-  self: scala.tools.nsc.typechecker.Analyzer =>
+trait JavaReflectionRuntime {
+  //self: scala.tools.nsc.typechecker.Analyzer =>
+  self: DefaultMacroRuntimes with util.Traces =>
 
   trait JavaReflectionResolvers {
     self: MacroRuntimeResolver =>

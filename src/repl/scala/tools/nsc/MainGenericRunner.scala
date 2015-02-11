@@ -40,7 +40,7 @@ class MainGenericRunner {
   def process(args: Array[String]): Boolean = {
     val command = new GenericRunnerCommand(args.toList, (x: String) => errorFn(x))
     import command.{ settings, howToRun, thingToRun, shortUsageMsg, shouldStopWithInfo }
-    def sampleCompiler = new Global(settings)   // def so it's not created unless needed
+    def sampleCompiler = new DefaultGlobal(settings)   // def so it's not created unless needed
 
     def run(): Boolean = {
       def isE   = !settings.execute.isDefault

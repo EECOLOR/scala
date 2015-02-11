@@ -24,7 +24,7 @@ abstract class ToolBoxFactory[U <: JavaUniverse](val u: U) { factorySelf =>
   def mkToolBox(frontEnd: FrontEnd = mkSilentFrontEnd(), options: String = ""): ToolBox[U] =
     new ToolBoxImpl(frontEnd, options)
 
-  private class ToolBoxImpl(val frontEnd: FrontEnd, val options: String) extends ToolBox[U] { toolBoxSelf =>
+  class ToolBoxImpl(val frontEnd: FrontEnd, val options: String) extends ToolBox[U] { toolBoxSelf =>
 
     val u: factorySelf.u.type = factorySelf.u
 
@@ -138,7 +138,7 @@ abstract class ToolBoxFactory[U <: JavaUniverse](val u: U) { factorySelf =>
           val withMacroFlag    = if (!withMacrosDisabled) (currentTyper.context.withMacrosEnabled[Tree] _) else (currentTyper.context.withMacrosDisabled[Tree] _)
           def withContext      (tree: => Tree) = withImplicitFlag(withMacroFlag(tree))
 
-          val run = new Run
+          val run = newRun
           run.symSource(ownerClass) = NoAbstractFile // need to set file to something different from null, so that currentRun.defines works
           phase = run.typerPhase // need to set a phase to something <= typerPhase, otherwise implicits in typedSelect will be disabled
           globalPhase = run.typerPhase // amazing... looks like phase and globalPhase are different things, so we need to set them separately
@@ -192,7 +192,7 @@ abstract class ToolBoxFactory[U <: JavaUniverse](val u: U) { factorySelf =>
         val unit = new CompilationUnit(NoSourceFile)
         unit.body = pdef
 
-        val run = new Run
+        val run = newRun
         reporter.reset()
         run.compileUnits(List(unit), run.namerPhase)
         throwIfErrors()

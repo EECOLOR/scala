@@ -16,8 +16,15 @@ import scala.reflect.internal.Depth
  *  @author Martin Odersky
  *  @version 1.0
  */
-trait Infer extends Checkable {
-  self: Analyzer =>
+trait DefaultInfer extends Infer with Checkable {
+  //self: Analyzer =>
+  self: Globals with 
+  Typers with 
+  Namers with 
+  DefaultContextErrors with /* Required because we extend DefaultInferencerContextErrors */
+  Contexts with
+  NamesDefaults with
+  Macros =>
 
   import global._
   import definitions._
@@ -73,7 +80,7 @@ trait Infer extends Checkable {
   // is not. But if it's a true CyclicReference then macro def will report it.
   // See comments to TypeSigError for an explanation of this special case.
   // [Eugene] is there a better way?
-  private object CheckAccessibleMacroCycle extends TypeCompleter {
+  private object CheckAccessibleMacroCycle extends DefaultTypeCompleter {
     val tree = EmptyTree
     override def complete(sym: Symbol) = ()
   }
@@ -82,8 +89,8 @@ trait Infer extends Checkable {
    */
   def freshVar(tparam: Symbol): TypeVar = TypeVar(tparam)
 
-  class NoInstance(msg: String) extends Throwable(msg) with ControlThrowable { }
-  private class DeferredNoInstance(getmsg: () => String) extends NoInstance("") {
+  class DefaultNoInstance(msg: String) extends Throwable(msg) with NoInstance with ControlThrowable { }
+  private class DeferredNoInstance(getmsg: () => String) extends DefaultNoInstance("") {
     override def getMessage(): String = getmsg()
   }
   private def ifNoInstance[T](f: String => T): PartialFunction[Throwable, T] = {
@@ -97,14 +104,14 @@ trait Infer extends Checkable {
     private var excludedVars = immutable.Set[TypeVar]()
     private def applyTypeVar(tv: TypeVar): Type = tv match {
       case TypeVar(origin, constr) if !constr.instValid => throw new DeferredNoInstance(() => s"no unique instantiation of type variable $origin could be found")
-      case _ if excludedVars(tv)                        => throw new NoInstance("cyclic instantiation")
+      case _ if excludedVars(tv)                        => throw new DefaultNoInstance("cyclic instantiation")
       case TypeVar(_, constr)                           =>
         excludedVars += tv
         try apply(constr.inst)
         finally excludedVars -= tv
     }
     def apply(tp: Type): Type = tp match {
-      case WildcardType | BoundedWildcardType(_) | NoType => throw new NoInstance("undetermined type")
+      case WildcardType | BoundedWildcardType(_) | NoType => throw new DefaultNoInstance("undetermined type")
       case tv: TypeVar if !tv.untouchable                 => applyTypeVar(tv)
       case _                                              => mapOver(tp)
     }
@@ -115,7 +122,7 @@ trait Infer extends Checkable {
 
   /** Is type fully defined, i.e. no embedded anytypes or wildcards in it?
    */
-  private[typechecker] def isFullyDefined(tp: Type): Boolean = tp match {
+  protected def isFullyDefined(tp: Type): Boolean = tp match {
     case WildcardType | BoundedWildcardType(_) | NoType => false
     case NoPrefix | ThisType(_) | ConstantType(_)       => true
     case TypeRef(pre, _, args)                          => isFullyDefined(pre) && (args forall isFullyDefined)
@@ -174,7 +181,7 @@ trait Infer extends Checkable {
   private lazy val stdErrorValue = stdErrorClass.newErrorValue(nme.ERROR)
 
   /** The context-dependent inferencer part */
-  abstract class Inferencer extends InferencerContextErrors with InferCheckable {
+  abstract class DefaultInferencer extends DefaultInferencerContextErrors with InferCheckable with Inferencer {
     def context: Context
     import InferErrorGen._
 
@@ -426,9 +433,8 @@ trait Infer extends Checkable {
     /** [Martin] Can someone comment this please? I have no idea what it's for
      *  and the code is not exactly readable.
      */
-    object AdjustedTypeArgs {
+    object DefaultAdjustedTypeArgs extends AdjustedTypeArgsObject {
       val Result  = mutable.LinkedHashMap
-      type Result = mutable.LinkedHashMap[Symbol, Option[Type]]
 
       def unapply(m: Result): Some[(List[Symbol], List[Type])] = Some(toLists(
         (m collect {case (p, Some(a)) => (p, a)}).unzip  ))
@@ -454,6 +460,8 @@ trait Infer extends Checkable {
       private def toLists[A1, A2, A3, A4](pxs: (Iterable[A1], Iterable[A2], Iterable[A3], Iterable[A4])) = (pxs._1.toList, pxs._2.toList, pxs._3.toList, pxs._4.toList)
     }
 
+    val AdjustedTypeArgs = DefaultAdjustedTypeArgs
+    
     /** Retract arguments that were inferred to Nothing because inference failed. Correct types for repeated params.
      *
      * We detect Nothing-due-to-failure by only retracting a parameter if either:
@@ -511,7 +519,7 @@ trait Infer extends Checkable {
                      argtpes: List[Type], pt: Type): AdjustedTypeArgs.Result = {
       val tvars = tparams map freshVar
       if (!sameLength(formals, argtpes))
-        throw new NoInstance("parameter lists differ in length")
+        throw new DefaultNoInstance("parameter lists differ in length")
 
       val restpeInst = restpe.instantiateTypeParams(tparams, tvars)
 
@@ -770,7 +778,7 @@ trait Infer extends Checkable {
      *    type is set to `Unit`, i.e. the corresponding argument is treated as
      *    an assignment expression (@see checkNames).
      */
-    private def isApplicable(undetparams: List[Symbol], ftpe: Type, argtpes0: List[Type], pt: Type): Boolean = (
+    private[typechecker] def isApplicable(undetparams: List[Symbol], ftpe: Type, argtpes0: List[Type], pt: Type): Boolean = (
       ftpe match {
         case OverloadedType(pre, alts) => alts exists (alt => isApplicable(undetparams, pre memberType alt, argtpes0, pt))
         case ExistentialType(_, qtpe)  => isApplicable(undetparams, qtpe, argtpes0, pt)
@@ -1236,7 +1244,7 @@ trait Infer extends Checkable {
       }
     }
 
-    object approximateAbstracts extends TypeMap {
+    object approximateAbstracts extends TypeMap with ApproximateAbstractsObject {
       def apply(tp: Type): Type = tp.dealiasWiden match {
         case TypeRef(pre, sym, _) if sym.isAbstractType => WildcardType
         case _                                          => mapOver(tp)
@@ -1278,7 +1286,9 @@ trait Infer extends Checkable {
      */
     def inferExprAlternative(tree: Tree, pt: Type): Tree = {
       val c = context
-      class InferTwice(pre: Type, alts: List[Symbol]) extends c.TryTwice {
+      class InferTwice(pre: Type, alts: List[Symbol]) {
+        def apply():Unit = c.tryTwice(tryOnce)
+        
         def tryOnce(isSecondTry: Boolean): Unit = {
           val alts0 = alts filter (alt => isWeaklyCompatible(pre memberType alt, pt))
           val alts1 = if (alts0.isEmpty) alts else alts0
@@ -1388,7 +1398,10 @@ trait Infer extends Checkable {
       // with and without views enabled, and bestForExpectedType will try again
       // with pt = WildcardType if it fails with pt != WildcardType.
       val c = context
-      class InferMethodAlternativeTwice extends c.TryTwice {
+      class InferMethodAlternativeTwice {
+        
+        def apply():Unit = c.tryTwice(tryOnce)
+        
         private[this] val OverloadedType(pre, alts) = tree.tpe
         private[this] var varargsStar = false
         private[this] val argtpes = argtpes0 mapConserve {

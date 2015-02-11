@@ -50,7 +50,7 @@ import scala.annotation.tailrec
  *
  *     Above, `A$mcI$sp` cannot access `d`, so the method cannot be typechecked.
  */
-abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
+private[nsc] abstract class DefaultSpecializeTypes extends InfoTransform with SpecializeTypes with TypingTransformers {
   import global._
   import definitions._
   import Flags._
@@ -1251,14 +1251,25 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
     }
   }
 
+  private[transform] def newDuplicator(casts: Map[Symbol, Type]):Duplicator = new DefaultDuplicator(casts)
   /** This duplicator additionally performs casts of expressions if that is allowed by the `casts` map. */
-  class Duplicator(casts: Map[Symbol, Type]) extends {
-    val global: SpecializeTypes.this.global.type = SpecializeTypes.this.global
-  } with typechecker.Duplicators {
+  private class DefaultDuplicator(casts: Map[Symbol, Type]) extends {
+    val global: DefaultSpecializeTypes.this.global.type = DefaultSpecializeTypes.this.global
+  } with typechecker.Duplicators with typechecker.DefaultAnalyzer with Duplicator {
     private val (castfrom, castto) = casts.unzip
     private object CastMap extends SubstTypeMap(castfrom.toList, castto.toList)
 
-    class BodyDuplicator(_context: Context) extends super.BodyDuplicator(_context) {
+    /** Return the special typer for duplicate method bodies. */
+    override def newTyper(context: Context, settings:TyperSettings = TyperSettings.Default): Typer =
+      super.newTyper(context, settings.copy(decorations = Some(newBodyDuplicatorDecorations)))
+    
+    // it's quite weird we override it here because this is the only place Duplicator is used
+    override protected def newBodyDuplicatorDecorations(self:Typer) = {
+      val bodyDuplicator = new BodyDuplicator(self)
+      TyperDecorations(typedHook = Some(bodyDuplicator.typed))
+    } 
+    
+    class BodyDuplicator(typer:Typer) extends super.BodyDuplicator(typer) {
       override def castType(tree: Tree, pt: Type): Tree = {
         tree modifyType fixType
         // log(" tree type: " + tree.tpe)
@@ -1272,8 +1283,6 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
         ntree.clearType()
       }
     }
-
-    protected override def newBodyDuplicator(context: Context) = new BodyDuplicator(context)
   }
 
   /** Introduced to fix SI-7343: Phase ordering problem between Duplicators and Specialization.
@@ -1300,11 +1309,18 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
    * Note: The constructors phase (which also uses duplication) comes after erasure and uses the
    * post-erasure typer => we must protect it from the beforeSpecialization phase shifting.
    */
-  class SpecializationDuplicator(casts: Map[Symbol, Type]) extends Duplicator(casts) {
+  private class SpecializationDuplicator(casts: Map[Symbol, Type]) extends DefaultDuplicator(casts) {
     override def retyped(context: Context, tree: Tree, oldThis: Symbol, newThis: Symbol, env: scala.collection.Map[Symbol, Type]): Tree =
       enteringSpecialize(super.retyped(context, tree, oldThis, newThis, env))
   }
 
+  private[transform] def newImplementationAdapter(
+      from: List[Symbol],
+      to: List[Symbol],
+      targetClass: Symbol,
+      addressFields: Boolean):ImplementationAdapter = 
+        new DefaultImplementationAdapter(from, to, targetClass, addressFields)
+  
   /** A tree symbol substituter that substitutes on type skolems.
    *  If a type parameter is a skolem, it looks for the original
    *  symbol in the 'from' and maps it to the corresponding new
@@ -1314,10 +1330,10 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
    *  All private members are made protected in order to be accessible from
    *  specialized classes.
    */
-  class ImplementationAdapter(from: List[Symbol],
+  class DefaultImplementationAdapter(from: List[Symbol],
                               to: List[Symbol],
                               targetClass: Symbol,
-                              addressFields: Boolean) extends TreeSymSubstituter(from, to) {
+                              addressFields: Boolean) extends TreeSymSubstituter(from, to) with ImplementationAdapter {
     override val symSubst = new SubstSymMap(from, to) {
       override def matches(sym1: Symbol, sym2: Symbol) =
         if (sym2.isTypeSkolem) sym2.deSkolemize eq sym1
@@ -1795,7 +1811,7 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
       // log("Type vars of: " + source + ": " + source.typeParams)
       // log("Type env of: " + tree.symbol + ": " + boundTvars)
       // log("newtparams: " + newtparams)
-      val symSubstituter = new ImplementationAdapter(
+      val symSubstituter = new DefaultImplementationAdapter(
         parameters(source) ::: origtparams,
         newSyms ::: newtparams,
         source.enclClass,

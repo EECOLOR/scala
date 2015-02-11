@@ -1,16 +1,17 @@
 package scala.tools.nsc
 package typechecker
 
-trait Tags {
-  self: Analyzer =>
+private[typechecker] trait Tags {
+  //self: Analyzer =>
+  self: Globals with 
+  Typers with
+  Implicits =>
 
   import global._
   import definitions._
 
   trait Tag {
     self: Typer =>
-
-    private val runDefinitions = currentRun.runDefinitions
 
     private def resolveTag(pos: Position, taggedTp: Type, allowMaterialization: Boolean) = enteringTyper {
       def wrapper (tree: => Tree): Tree = if (allowMaterialization) (context.withMacrosEnabled[Tree](tree)) else (context.withMacrosDisabled[Tree](tree))

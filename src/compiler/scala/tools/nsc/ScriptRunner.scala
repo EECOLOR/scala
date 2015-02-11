@@ -107,7 +107,7 @@ class ScriptRunner extends HasCompileSocket {
         val reporter = new ConsoleReporter(settings)
         val compiler = newGlobal(settings, reporter)
 
-        new compiler.Run compile List(scriptFile)
+        compiler.newRun compile List(scriptFile)
         if (reporter.hasErrors) None else Some(compiledPath)
       }
       else if (compileWithDaemon(settings, scriptFile)) Some(compiledPath)

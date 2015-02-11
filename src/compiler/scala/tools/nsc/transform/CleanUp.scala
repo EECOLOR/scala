@@ -17,6 +17,8 @@ abstract class CleanUp extends Statics with Transform with ast.TreeDSL {
   import CODE._
   import treeInfo.StripCast
 
+  val gen:global.gen.type = global.gen
+  
   /** the following two members override abstract members in Transform */
   val phaseName: String = "cleanup"
 

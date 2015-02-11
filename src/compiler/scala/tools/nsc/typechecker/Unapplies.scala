@@ -12,8 +12,11 @@ import symtab.Flags._
  *  @author  Martin Odersky
  *  @version 1.0
  */
-trait Unapplies extends ast.TreeDSL {
-  self: Analyzer =>
+trait DefaultUnapplies extends Unapplies {
+  //self: Analyzer =>
+  self: Globals with
+  SyntheticMethods with 
+  ast.TreeDSL =>
 
   import global._
   import definitions._
@@ -23,13 +26,6 @@ trait Unapplies extends ast.TreeDSL {
   private def unapplyParamName = nme.x_0
   private def caseMods         = Modifiers(SYNTHETIC | CASE)
 
-  // In the typeCompleter (templateSig) of a case class (resp it's module),
-  // synthetic `copy` (reps `apply`, `unapply`) methods are added. To compute
-  // their signatures, the corresponding ClassDef is needed. During naming (in
-  // `enterClassDef`), the case class ClassDef is added as an attachment to the
-  // moduleClass symbol of the companion module.
-  class ClassForCaseCompanionAttachment(val caseClass: ClassDef)
-
   /** Returns unapply or unapplySeq if available, without further checks.
    */
   def directUnapplyMember(tp: Type): Symbol = (tp member nme.unapply) orElse (tp member nme.unapplySeq)
@@ -38,10 +34,6 @@ trait Unapplies extends ast.TreeDSL {
    *  as they cannot be used as extractors
    */
   def unapplyMember(tp: Type): Symbol = directUnapplyMember(tp) filter (sym => !hasMultipleNonImplicitParamLists(sym))
-
-  object HasUnapply {
-    def unapply(tp: Type): Option[Symbol] = unapplyMember(tp).toOption
-  }
 
   private def toIdent(x: DefTree) = Ident(x.name) setPos x.pos.focus
 

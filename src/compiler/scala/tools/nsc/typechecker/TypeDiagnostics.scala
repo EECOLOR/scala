@@ -31,8 +31,13 @@ import PartialFunction._
  *  @author Paul Phillips
  *  @version 1.0
  */
-trait TypeDiagnostics {
-  self: Analyzer =>
+private[typechecker] trait TypeDiagnostics {
+  //self: Analyzer =>
+  self: Globals with
+  Contexts with
+  Typers with
+  Namers with
+  DefaultContextErrors =>
 
   import global._
   import definitions._
@@ -432,13 +437,13 @@ trait TypeDiagnostics {
     }
   }
 
-  trait TyperDiagnostics {
+  trait DefaultTyperDiagnostics {
     self: Typer =>
 
     def permanentlyHiddenWarning(pos: Position, hidden: Name, defn: Symbol) =
       context.warning(pos, "imported `%s' is permanently hidden by definition of %s".format(hidden, defn.fullLocationString))
 
-    object checkUnused {
+    object checkUnused extends checkUnusedObject {
       val ignoreNames = Set[TermName]("readResolve", "readObject", "writeObject", "writeReplace")
 
       class UnusedPrivates extends Traverser {

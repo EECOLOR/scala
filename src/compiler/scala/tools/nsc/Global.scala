@@ -23,7 +23,6 @@ import symtab.classfile.Pickler
 import plugins.Plugins
 import ast._
 import ast.parser._
-import typechecker._
 import transform.patmat.PatternMatching
 import transform._
 import backend.icode.{ ICodes, GenICode, ICodeCheckers }
@@ -37,17 +36,8 @@ import scala.tools.nsc.ast.{TreeGen => AstTreeGen}
 import scala.tools.nsc.classpath.FlatClassPath
 import scala.tools.nsc.settings.ClassPathRepresentationType
 
-class Global(var currentSettings: Settings, var reporter: Reporter)
-    extends SymbolTable
-    with CompilationUnits
-    with Plugins
-    with PhaseAssembly
-    with Trees
-    with Printers
-    with DocComments
-    with Positions
-    with Reporting
-    with Parsing { self =>
+class DefaultGlobal(var currentSettings: Settings, var reporter: Reporter)
+    extends Global  { self =>
 
   // the mirror --------------------------------------------------
 
@@ -100,11 +90,10 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   // platform specific elements
 
   protected class GlobalPlatform extends {
-    val global: Global.this.type = Global.this
-    val settings: Settings = Global.this.settings
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
+    val settings: Settings = DefaultGlobal.this.settings
   } with JavaPlatform
 
-  type ThisPlatform = JavaPlatform { val global: Global.this.type }
   lazy val platform: ThisPlatform  = new GlobalPlatform
 
   type PlatformClassPath = ClassPath[AbstractFile]
@@ -122,64 +111,62 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   // sub-components --------------------------------------------------
 
   /** Tree generation, usually based on existing symbols. */
-  override object gen extends {
-    val global: Global.this.type = Global.this
-  } with AstTreeGen {
+  override object genImplementation extends {
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
+  } with AstTreeGen with CustomGen {
     def mkAttributedCast(tree: Tree, pt: Type): Tree =
       typer.typed(mkCast(tree, pt))
   }
 
   /** A spare instance of TreeBuilder left for backwards compatibility. */
-  lazy val treeBuilder: TreeBuilder { val global: Global.this.type } = new TreeBuilder {
-    val global: Global.this.type = Global.this;
+  lazy val treeBuilder: TreeBuilder { val global: DefaultGlobal.this.type } = new TreeBuilder {
+    val global: DefaultGlobal.this.type = DefaultGlobal.this;
     def unit = currentUnit
     def source = currentUnit.source
   }
 
   /** Fold constants */
   object constfold extends {
-    val global: Global.this.type = Global.this
-  } with ConstantFolder
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
+  } with typechecker.ConstantFolder
 
   /** ICode generator */
   object icodes extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
   } with ICodes
 
   /** Scala primitives, used in genicode */
   object scalaPrimitives extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
   } with ScalaPrimitives
 
   /** Computing pairs of overriding/overridden symbols */
   object overridingPairs extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
   } with OverridingPairs
-
-  type SymbolPair = overridingPairs.SymbolPair
 
   // Optimizer components
 
   /** ICode analysis for optimization */
   object analysis extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
   } with TypeFlowAnalysis
 
   /** Copy propagation for optimization */
   object copyPropagation extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
   } with CopyPropagation
 
   // Components for collecting and generating output
 
   /** Some statistics (normally disabled) set with -Ystatistics */
   object statistics extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
   } with StatisticsInfo
 
   /** Print tree in detailed form */
   object nodePrinters extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
   } with NodePrinters {
     var lastPrintedPhase: Phase = NoPhase
     var lastPrintedSource: String = ""
@@ -217,7 +204,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
   /** Representing ASTs as graphs */
   object treeBrowsers extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
   } with TreeBrowsers
 
   val nodeToString = nodePrinters.nodeToString
@@ -376,8 +363,8 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   }
 
   lazy val loaders = new {
-    val global: Global.this.type = Global.this
-    val platform: Global.this.platform.type = Global.this.platform
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
+    val platform: DefaultGlobal.this.platform.type = DefaultGlobal.this.platform
   } with GlobalSymbolLoaders
 
   /** Returns the mirror that loaded given symbol */
@@ -391,59 +378,9 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
   val phaseWithId: Array[Phase] = Array.fill(MaxPhases)(NoPhase)
 
-  abstract class GlobalPhase(prev: Phase) extends Phase(prev) {
-    phaseWithId(id) = this
-
-    def run() {
-      echoPhaseSummary(this)
-      currentRun.units foreach applyPhase
-    }
-
-    def apply(unit: CompilationUnit): Unit
-
-    private val isErased = prev.name == "erasure" || prev.erasedTypes
-    override def erasedTypes: Boolean = isErased
-    private val isFlat = prev.name == "flatten" || prev.flatClasses
-    override def flatClasses: Boolean = isFlat
-    private val isSpecialized = prev.name == "specialize" || prev.specialized
-    override def specialized: Boolean = isSpecialized
-    private val isRefChecked = prev.name == "refchecks" || prev.refChecked
-    override def refChecked: Boolean = isRefChecked
-
-    /** Is current phase cancelled on this unit? */
-    def cancelled(unit: CompilationUnit) = {
-      // run the typer only if in `createJavadoc` mode
-      val maxJavaPhase = if (createJavadoc) currentRun.typerPhase.id else currentRun.namerPhase.id
-      reporter.cancelled || unit.isJava && this.id > maxJavaPhase
-    }
-
-    final def withCurrentUnit(unit: CompilationUnit)(task: => Unit) {
-      if ((unit ne null) && unit.exists)
-        lastSeenSourceFile = unit.source
-
-      if (settings.debug && (settings.verbose || currentRun.size < 5))
-        inform("[running phase " + name + " on " + unit + "]")
-
-      val unit0 = currentUnit
-      try {
-        currentRun.currentUnit = unit
-        if (!cancelled(unit)) {
-          currentRun.informUnitStarting(this, unit)
-          task
-        }
-        currentRun.advanceUnit()
-      } finally {
-        //assert(currentUnit == unit)
-        currentRun.currentUnit = unit0
-      }
-    }
-
-    final def applyPhase(unit: CompilationUnit) = withCurrentUnit(unit)(apply(unit))
-  }
-
   // phaseName = "parser"
   lazy val syntaxAnalyzer = new {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
   } with SyntaxAnalyzer {
     val runsAfter = List[String]()
     val runsRightAfter = None
@@ -460,13 +397,12 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   // I only changed analyzer.
   //
   // factory for phases: namer, packageobjects, typer
-  lazy val analyzer = new {
-    val global: Global.this.type = Global.this
-  } with Analyzer
+  lazy val analyzer: typechecker.Analyzer with CorrectGlobalType = 
+    GlobalImplementations.analyzerInstance(this)
 
   // phaseName = "patmat"
   object patmat extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
     val runsAfter = List("typer")
     val runsRightAfter = None
     // patmat doesn't need to be right after typer, as long as we run before superaccessors
@@ -475,182 +411,176 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
   // phaseName = "superaccessors"
   object superAccessors extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
     val runsAfter = List("patmat")
     val runsRightAfter = None
-  } with SuperAccessors
+  } with typechecker.SuperAccessors
 
   // phaseName = "extmethods"
   object extensionMethods extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
     val runsAfter = List("superaccessors")
     val runsRightAfter = None
   } with ExtensionMethods
 
   // phaseName = "pickler"
   object pickler extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
     val runsAfter = List("extmethods")
     val runsRightAfter = None
   } with Pickler
 
   // phaseName = "refchecks"
-  override object refChecks extends {
-    val global: Global.this.type = Global.this
+  object refChecksImplementation extends {
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
     val runsAfter = List("pickler")
     val runsRightAfter = None
-  } with RefChecks
+  } with typechecker.RefChecks
 
   // phaseName = "uncurry"
-  override object uncurry extends {
-    val global: Global.this.type = Global.this
+  object uncurryImplementation extends {
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
     val runsAfter = List("refchecks")
     val runsRightAfter = None
   } with UnCurry
 
   // phaseName = "tailcalls"
   object tailCalls extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
     val runsAfter = List("uncurry")
     val runsRightAfter = None
   } with TailCalls
 
   // phaseName = "explicitouter"
   object explicitOuter extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
     val runsAfter = List("tailcalls")
     val runsRightAfter = None
   } with ExplicitOuter
 
   // phaseName = "specialize"
-  object specializeTypes extends {
-    val global: Global.this.type = Global.this
-    val runsAfter = List("")
-    val runsRightAfter = Some("tailcalls")
-  } with SpecializeTypes
-
+  lazy val specializeTypes: SubComponent with SpecializeTypes with CorrectGlobalType = 
+    GlobalImplementations.specializeTypesInstance(this)
+  
   // phaseName = "erasure"
-  override object erasure extends {
-    val global: Global.this.type = Global.this
-    val runsAfter = List("explicitouter")
-    val runsRightAfter = Some("explicitouter")
-  } with Erasure
+  lazy val erasureImplementation: SubComponent with Erasure with CorrectGlobalType = 
+    GlobalImplementations.erasureInstance(this)
 
   // phaseName = "posterasure"
-  override object postErasure extends {
-    val global: Global.this.type = Global.this
+  object postErasureImplementation extends {
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
     val runsAfter = List("erasure")
     val runsRightAfter = Some("erasure")
   } with PostErasure
 
   // phaseName = "lazyvals"
   object lazyVals extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
     val runsAfter = List("erasure")
     val runsRightAfter = None
   } with LazyVals
 
   // phaseName = "lambdalift"
   object lambdaLift extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
     val runsAfter = List("lazyvals")
     val runsRightAfter = None
   } with LambdaLift
 
   // phaseName = "constructors"
   object constructors extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
     val runsAfter = List("lambdalift")
     val runsRightAfter = None
   } with Constructors
 
   // phaseName = "flatten"
   object flatten extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
     val runsAfter = List("constructors")
     val runsRightAfter = None
   } with Flatten
 
   // phaseName = "mixin"
   object mixer extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
     val runsAfter = List("flatten", "constructors")
     val runsRightAfter = None
   } with Mixin
 
   // phaseName = "cleanup"
   object cleanup extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
     val runsAfter = List("mixin")
     val runsRightAfter = None
   } with CleanUp
 
   // phaseName = "delambdafy"
   object delambdafy extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
     val runsAfter = List("cleanup")
     val runsRightAfter = None
   } with Delambdafy
 
   // phaseName = "icode"
   object genicode extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
     val runsAfter = List("cleanup")
     val runsRightAfter = None
   } with GenICode
 
   // phaseName = "inliner"
   object inliner extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
     val runsAfter = List("icode")
     val runsRightAfter = None
   } with Inliners
 
   // phaseName = "inlinehandlers"
   object inlineExceptionHandlers extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
     val runsAfter = List("inliner")
     val runsRightAfter = None
   } with InlineExceptionHandlers
 
   // phaseName = "closelim"
   object closureElimination extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
     val runsAfter = List("inlinehandlers")
     val runsRightAfter = None
   } with ClosureElimination
 
   // phaseName = "constopt"
   object constantOptimization extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
     val runsAfter = List("closelim")
     val runsRightAfter = None
   } with ConstantOptimization
 
   // phaseName = "dce"
   object deadCode extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
     val runsAfter = List("closelim")
     val runsRightAfter = None
   } with DeadCodeElimination
 
   // phaseName = "jvm", ASM-based version
   object genASM extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
     val runsAfter = List("dce")
     val runsRightAfter = None
   } with GenASM
 
   // phaseName = "bcode"
   object genBCode extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
     val runsAfter = List("dce")
     val runsRightAfter = None
   } with GenBCode
 
   // phaseName = "terminal"
   object terminal extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
   } with SubComponent {
     val phaseName = "terminal"
     val runsAfter = List("jvm")
@@ -671,18 +601,17 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
    */
 
   /** Tree checker */
-  object treeChecker extends {
-    val global: Global.this.type = Global.this
-  } with TreeCheckers
+  lazy val treeChecker: typechecker.TreeCheckers with CorrectGlobalType = 
+    GlobalImplementations.treeCheckerInstance(this)
 
   /** Icode verification */
   object icodeCheckers extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
   } with ICodeCheckers
 
   object icodeChecker extends icodeCheckers.ICodeChecker()
 
-  object typer extends analyzer.Typer(
+  lazy val typer = analyzer.newTyper(
     analyzer.NoContext.make(EmptyTree, RootClass, newScope)
   )
 
@@ -766,7 +695,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
   /** The names of the phases. */
   lazy val phaseNames = {
-    new Run // force some initialization
+    newRun // force some initialization
     phaseDescriptors map (_.phaseName)
   }
 
@@ -1011,7 +940,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   private var curRunId = 0
 
   object typeDeconstruct extends {
-    val global: Global.this.type = Global.this
+    val global: DefaultGlobal.this.type = DefaultGlobal.this
   } with typechecker.StructuredTypeStrings
 
   /** There are common error conditions where when the exception hits
@@ -1049,7 +978,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   @inline final def exitingExplicitOuter[T](op: => T): T  = exitingPhase(currentRun.explicitouterPhase)(op)
   @inline final def exitingFlatten[T](op: => T): T        = exitingPhase(currentRun.flattenPhase)(op)
   @inline final def exitingMixin[T](op: => T): T          = exitingPhase(currentRun.mixinPhase)(op)
-  @inline final def exitingDelambdafy[T](op: => T): T     = exitingPhase(currentRun.delambdafyPhase)(op)
+  //@inline final def exitingDelambdafy[T](op: => T): T     = exitingPhase(currentRun.delambdafyPhase)(op)
   @inline final def exitingPickler[T](op: => T): T        = exitingPhase(currentRun.picklerPhase)(op)
   @inline final def exitingRefchecks[T](op: => T): T      = exitingPhase(currentRun.refchecksPhase)(op)
   @inline final def exitingSpecialize[T](op: => T): T     = exitingPhase(currentRun.specializePhase)(op)
@@ -1060,7 +989,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   @inline final def enteringFlatten[T](op: => T): T       = enteringPhase(currentRun.flattenPhase)(op)
   @inline final def enteringIcode[T](op: => T): T         = enteringPhase(currentRun.icodePhase)(op)
   @inline final def enteringMixin[T](op: => T): T         = enteringPhase(currentRun.mixinPhase)(op)
-  @inline final def enteringDelambdafy[T](op: => T): T    = enteringPhase(currentRun.delambdafyPhase)(op)
+  //@inline final def enteringDelambdafy[T](op: => T): T    = enteringPhase(currentRun.delambdafyPhase)(op)
   @inline final def enteringPickler[T](op: => T): T       = enteringPhase(currentRun.picklerPhase)(op)
   @inline final def enteringSpecialize[T](op: => T): T    = enteringPhase(currentRun.specializePhase)(op)
   @inline final def enteringTyper[T](op: => T): T         = enteringPhase(currentRun.typerPhase)(op)
@@ -1140,9 +1069,11 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   def newUnitParser(code: String, filename: String = "<console>"): UnitParser =
     newUnitParser(newCompilationUnit(code, filename))
 
+  def newRun():Run = new DefaultRun()
+    
   /** A Run is a single execution of the compiler on a set of units.
    */
-  class Run extends RunContextApi with RunReporting with RunParsing {
+  class DefaultRun extends Run with RunContextApi with RunReporting with RunParsing {
     /** Have been running into too many init order issues with Run
      *  during erroneous conditions.  Moved all these vals up to the
      *  top of the file so at least they're not trivially null.
@@ -1447,7 +1378,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
     // Similarly, this will only be created under -Yshow-syms.
     object trackerFactory extends SymbolTrackers {
-      val global: Global.this.type = Global.this
+      val global: DefaultGlobal.this.type = DefaultGlobal.this
       lazy val trackers = currentRun.units.toList map (x => SymbolTracker(x))
       def snapshot() = {
         inform("\n[[symbol layout at end of " + phase + "]]")
@@ -1692,8 +1623,4 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     })
   }
   def createJavadoc    = false
-}
-
-object Global {
-  def apply(settings: Settings, reporter: Reporter): Global = new Global(settings, reporter)
 }
