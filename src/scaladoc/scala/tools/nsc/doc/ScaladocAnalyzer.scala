@@ -7,18 +7,18 @@ package scala.tools.nsc
 package doc
 
 import scala.tools.nsc.ast.parser.{ SyntaxAnalyzer, BracePatch }
-import typechecker.Analyzer
+import typechecker.DefaultAnalyzer
 import scala.reflect.internal.Chars._
 import scala.reflect.internal.util.{ BatchSourceFile, Position }
 import scala.tools.nsc.doc.base.{ CommentFactoryBase, MemberLookupBase, LinkTo, LinkToExternal }
 
-trait ScaladocAnalyzer extends Analyzer {
+trait ScaladocAnalyzer extends DefaultAnalyzer {
   val global : Global // generally, a ScaladocGlobal
   import global._
 
-  override def newTyper(context: Context): ScaladocTyper = new Typer(context) with ScaladocTyper
+  override def newTyper(context: Context): ScaladocTyper = new DefaultTyper(context) with ScaladocTyper
 
-  trait ScaladocTyper extends Typer {
+  trait ScaladocTyper extends DefaultTyper {
     private def unit = context.unit
 
     override def canAdaptConstantTypeToLiteral = false

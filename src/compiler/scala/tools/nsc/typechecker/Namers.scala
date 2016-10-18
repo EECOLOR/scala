@@ -16,8 +16,19 @@ import scala.language.postfixOps
  *  @author Martin Odersky
  *  @version 1.0
  */
-trait Namers extends MethodSynthesis {
-  self: Analyzer =>
+trait DefaultNamers extends Namers with MethodSynthesis {
+  // self:Analyzer =>
+  self: Globals with
+  Typers with 
+  Unapplies with 
+  Contexts with 
+  DefaultContextErrors with 
+  AnalyzerPlugins with 
+  SyntheticMethods with 
+  NamesDefaults with
+  Macros with
+  ast.TreeDSL // Required by MethodSynthesis
+  => 
 
   import global._
   import definitions._
@@ -47,10 +58,10 @@ trait Namers extends MethodSynthesis {
     case _                 => false
   }
 
-  private class NormalNamer(context: Context) extends Namer(context)
-  def newNamer(context: Context): Namer = new NormalNamer(context)
+  private class NormalNamer(context: Context) extends DefaultNamer(context)
+  def newNamer(context: Context): DefaultNamer = new NormalNamer(context)
 
-  abstract class Namer(val context: Context) extends MethodSynth with NamerContextErrors { thisNamer =>
+  abstract class DefaultNamer(val context: Context) extends Namer with MethodSynth with DefaultNamerContextErrors { thisNamer =>
     // overridden by the presentation compiler
     def saveDefaultGetter(meth: Symbol, default: Symbol) { }
 
@@ -60,7 +71,7 @@ trait Namers extends MethodSynthesis {
     private lazy val innerNamer =
       if (isTemplateContext(context)) createInnerNamer() else this
 
-    def createNamer(tree: Tree): Namer = {
+    def createNamer(tree: Tree): DefaultNamer = {
       val sym = tree match {
         case ModuleDef(_, _, _) => tree.symbol.moduleClass
         case _                  => tree.symbol
@@ -885,7 +896,7 @@ trait Namers extends MethodSynthesis {
     }
 
     // owner is the class with the self type
-    def enterSelf(self: ValDef) {
+    private def enterSelf(self: ValDef) {
       val ValDef(_, name, tpt, _) = self
       if (self eq noSelfType)
         return
@@ -1675,16 +1686,12 @@ trait Namers extends MethodSynthesis {
     }
   }
 
-  abstract class TypeCompleter extends LazyType {
-    val tree: Tree
-  }
-
   def mkTypeCompleter(t: Tree)(c: Symbol => Unit) = new LockingTypeCompleter with FlagAgnosticCompleter {
     val tree = t
     def completeImpl(sym: Symbol) = c(sym)
   }
 
-  trait LockingTypeCompleter extends TypeCompleter {
+  trait LockingTypeCompleter extends DefaultTypeCompleter {
     def completeImpl(sym: Symbol): Unit
 
     override def complete(sym: Symbol) = {
@@ -1737,7 +1744,7 @@ trait Namers extends MethodSynthesis {
   //    def foo[T, T2](a: T, x: T2)(implicit w: ComputeT2[T, T2])
   // moreover, the latter is not an encoding of the former, which hides type
   // inference of T2, so you can specify T while T2 is purely computed
-  private class DependentTypeChecker(ctx: Context)(namer: Namer) extends TypeTraverser {
+  private class DependentTypeChecker(ctx: Context)(namer: DefaultNamer) extends TypeTraverser {
     private[this] val okParams = mutable.Set[Symbol]()
     private[this] val method   = ctx.owner
 
@@ -1786,4 +1793,11 @@ trait Namers extends MethodSynthesis {
       companionSymbolOf(original.sourceModule, ctx)
     else
       companionSymbolOf(original, ctx).moduleClass
+      
+  // In the typeCompleter (templateSig) of a case class (resp it's module),
+  // synthetic `copy` (reps `apply`, `unapply`) methods are added. To compute
+  // their signatures, the corresponding ClassDef is needed. During naming (in
+  // `enterClassDef`), the case class ClassDef is added as an attachment to the
+  // moduleClass symbol of the companion module.
+  class ClassForCaseCompanionAttachment(val caseClass: ClassDef)
 }

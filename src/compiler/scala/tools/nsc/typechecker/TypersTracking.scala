@@ -11,8 +11,11 @@ import scala.reflect.internal.util.{ BatchSourceFile, Statistics }
 import mutable.ListBuffer
 import Mode._
 
-trait TypersTracking {
-  self: Analyzer =>
+private[typechecker] trait TypersTracking {
+  //self: Analyzer =>
+  self: Globals with
+  Typers with
+  Contexts =>
 
   import global._
   import typeDebug._
@@ -49,7 +52,7 @@ trait TypersTracking {
     s"($marker$undet_s: ${context.siteString}$owner_long_s) $implicits_s"
   }
 
-  object typingStack {
+  object typingStack extends TypingStackObject {
     val out = new java.io.PrintWriter(System.err, true)
 
     // TODO - account for colors so the color of a multiline string

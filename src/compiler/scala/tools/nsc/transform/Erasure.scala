@@ -12,9 +12,9 @@ import symtab._
 import Flags._
 import scala.reflect.internal.Mode._
 
-abstract class Erasure extends AddInterfaces
-                          with scala.reflect.internal.transform.Erasure
-                          with typechecker.Analyzer
+abstract class DefaultErasure extends AddInterfaces 
+                          with Erasure
+                          with typechecker.DefaultAnalyzer
                           with TypingTransformers
                           with ast.TreeDSL
                           with TypeAdaptingTransformer
@@ -23,8 +23,8 @@ abstract class Erasure extends AddInterfaces
   import definitions._
   import CODE._
 
-  val analyzer: typechecker.Analyzer { val global: Erasure.this.global.type } =
-    this.asInstanceOf[typechecker.Analyzer { val global: Erasure.this.global.type }]
+  val analyzer: typechecker.Analyzer { val global: DefaultErasure.this.global.type } =
+    this.asInstanceOf[typechecker.Analyzer { val global: DefaultErasure.this.global.type }]
 
   val phaseName: String = "erasure"
 
@@ -573,7 +573,7 @@ abstract class Erasure extends AddInterfaces
   }
 
   /** The modifier typer which retypes with erased types. */
-  class Eraser(_context: Context) extends Typer(_context) with TypeAdapter {
+  class Eraser(_context: Context) extends DefaultTyper(_context) with TypeAdapter {
     val typer = this.asInstanceOf[analyzer.Typer]
 
     override protected def stabilize(tree: Tree, pre: Type, mode: Mode, pt: Type): Tree = tree

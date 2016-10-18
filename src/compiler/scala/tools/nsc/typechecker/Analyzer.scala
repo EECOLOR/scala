@@ -8,29 +8,28 @@ package typechecker
 
 import scala.reflect.internal.util.Statistics
 
+
 /** The main attribution phase.
  */
-trait Analyzer extends AnyRef
-            with Contexts
-            with Namers
-            with Typers
-            with Infer
-            with Implicits
-            with EtaExpansion
-            with SyntheticMethods
-            with Unapplies
-            with Macros
-            with NamesDefaults
-            with TypeDiagnostics
-            with ContextErrors
-            with StdAttachments
-            with AnalyzerPlugins
-{
-  val global : Global
+trait DefaultAnalyzer extends Analyzer 
+    with DefaultContexts
+    with DefaultNamers
+    with DefaultTypers
+    with DefaultInfer
+    with DefaultImplicits
+    with DefaultSyntheticMethods
+    with DefaultUnapplies
+    with DefaultMacros
+    with DefaultNamesDefaults
+    with DefaultContextErrors
+    with DefaultStdAttachments
+    with DefaultAnalyzerPlugins
+    with ast.TreeDSL {
+  
   import global._
-
+  
   object namerFactory extends {
-    val global: Analyzer.this.global.type = Analyzer.this.global
+    val global: DefaultAnalyzer.this.global.type = DefaultAnalyzer.this.global
   } with SubComponent {
     val phaseName = "namer"
     val runsAfter = List[String]("parser")
@@ -46,7 +45,7 @@ trait Analyzer extends AnyRef
   }
 
   object packageObjects extends {
-    val global: Analyzer.this.global.type = Analyzer.this.global
+    val global: DefaultAnalyzer.this.global.type = DefaultAnalyzer.this.global
   } with SubComponent {
     val phaseName = "packageobjects"
     val runsAfter = List[String]()
@@ -74,7 +73,7 @@ trait Analyzer extends AnyRef
   }
 
   object typerFactory extends {
-    val global: Analyzer.this.global.type = Analyzer.this.global
+    val global: DefaultAnalyzer.this.global.type = DefaultAnalyzer.this.global
   } with SubComponent {
     import scala.reflect.internal.TypesStats.typerNanos
     val phaseName = "typer"

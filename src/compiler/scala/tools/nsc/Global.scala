@@ -23,7 +23,6 @@ import symtab.classfile.Pickler
 import plugins.Plugins
 import ast._
 import ast.parser._
-import typechecker._
 import transform.patmat.PatternMatching
 import transform._
 import backend.icode.{ ICodes, GenICode, ICodeCheckers }
@@ -139,7 +138,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   /** Fold constants */
   object constfold extends {
     val global: Global.this.type = Global.this
-  } with ConstantFolder
+  } with typechecker.ConstantFolder
 
   /** ICode generator */
   object icodes extends {
@@ -460,9 +459,11 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   // I only changed analyzer.
   //
   // factory for phases: namer, packageobjects, typer
-  lazy val analyzer = new {
-    val global: Global.this.type = Global.this
-  } with Analyzer
+  type CorrectGlobalType = {
+    val global: Global.this.type
+  }
+  lazy val analyzer: typechecker.Analyzer with CorrectGlobalType = 
+    GlobalImplementations.analyzerInstance(this)
 
   // phaseName = "patmat"
   object patmat extends {
@@ -478,7 +479,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     val global: Global.this.type = Global.this
     val runsAfter = List("patmat")
     val runsRightAfter = None
-  } with SuperAccessors
+  } with typechecker.SuperAccessors
 
   // phaseName = "extmethods"
   object extensionMethods extends {
@@ -499,7 +500,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
     val global: Global.this.type = Global.this
     val runsAfter = List("pickler")
     val runsRightAfter = None
-  } with RefChecks
+  } with typechecker.RefChecks
 
   // phaseName = "uncurry"
   override object uncurry extends {
@@ -523,18 +524,12 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
   } with ExplicitOuter
 
   // phaseName = "specialize"
-  object specializeTypes extends {
-    val global: Global.this.type = Global.this
-    val runsAfter = List("")
-    val runsRightAfter = Some("tailcalls")
-  } with SpecializeTypes
-
+  lazy val specializeTypes: SubComponent with SpecializeTypes with CorrectGlobalType = 
+    GlobalImplementations.specializeTypesInstance(this)
+  
   // phaseName = "erasure"
-  override object erasure extends {
-    val global: Global.this.type = Global.this
-    val runsAfter = List("explicitouter")
-    val runsRightAfter = Some("explicitouter")
-  } with Erasure
+  override lazy val erasure: SubComponent with Erasure with CorrectGlobalType = 
+    GlobalImplementations.erasureInstance(this)
 
   // phaseName = "posterasure"
   override object postErasure extends {
@@ -671,9 +666,8 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
    */
 
   /** Tree checker */
-  object treeChecker extends {
-    val global: Global.this.type = Global.this
-  } with TreeCheckers
+  lazy val treeChecker: typechecker.TreeCheckers with CorrectGlobalType = 
+    GlobalImplementations.treeCheckerInstance(this)
 
   /** Icode verification */
   object icodeCheckers extends {
@@ -682,7 +676,7 @@ class Global(var currentSettings: Settings, var reporter: Reporter)
 
   object icodeChecker extends icodeCheckers.ICodeChecker()
 
-  object typer extends analyzer.Typer(
+  lazy val typer = analyzer.newTyper(
     analyzer.NoContext.make(EmptyTree, RootClass, newScope)
   )
 

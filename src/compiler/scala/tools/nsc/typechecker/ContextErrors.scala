@@ -14,30 +14,39 @@ import scala.reflect.macros.runtime.AbortMacroException
 import scala.util.control.NonFatal
 import scala.tools.nsc.util.stackTraceString
 import scala.reflect.io.NoAbstractFile
+import scala.reflect.macros.util.Traces
 
-trait ContextErrors {
-  self: Analyzer =>
-
+trait DefaultContextErrors extends ContextErrors {
+  //self: Analyzer =>
+  self: Globals with 
+  Contexts with 
+  Macros with 
+  Implicits with
+  Typers with
+  Infer with
+  Unapplies with 
+  Namers with
+  Traces =>
+    
   import global._
   import definitions._
 
-  sealed abstract class AbsTypeError extends Throwable {
-    def errPos: Position
-    def errMsg: String
-    override def toString() = "[Type error at:" + errPos + "] " + errMsg
+  sealed abstract class DefaultAbsTypeError extends Throwable with AbsTypeError {
+	  def errPos: Position
+	  def errMsg: String
+	  override def toString() = "[Type error at:" + errPos + "] " + errMsg
   }
-
-  abstract class AbsAmbiguousTypeError extends AbsTypeError
+  abstract class DefaultAbsAmbiguousTypeError extends DefaultAbsTypeError with AbsAmbiguousTypeError
 
   case class AmbiguousTypeError(errPos: Position, errMsg: String)
-    extends AbsAmbiguousTypeError
+    extends DefaultAbsAmbiguousTypeError
 
   case class AmbiguousImplicitTypeError(underlyingTree: Tree, errMsg: String)
-    extends AbsAmbiguousTypeError {
+    extends DefaultAbsAmbiguousTypeError {
     def errPos = underlyingTree.pos
   }
 
-  sealed abstract class TreeTypeError extends AbsTypeError {
+  sealed abstract class TreeTypeError extends DefaultAbsTypeError {
     def underlyingTree: Tree
     def errPos = underlyingTree.pos
   }
@@ -49,7 +58,7 @@ trait ContextErrors {
     extends TreeTypeError
 
   case class SymbolTypeError(underlyingSym: Symbol, errMsg: String)
-    extends AbsTypeError {
+    extends DefaultAbsTypeError {
 
     def errPos = underlyingSym.pos
   }
@@ -74,8 +83,8 @@ trait ContextErrors {
   //    (pt at the point of divergence gives less information to the user)
   // Note: it is safe to delay error message generation in this case
   // because we don't modify implicits' infos.
-  case class DivergentImplicitTypeError(underlyingTree: Tree, pt0: Type, sym: Symbol)
-    extends TreeTypeError {
+  case class DefaultDivergentImplicitTypeError(underlyingTree: Tree, pt0: Type, sym: Symbol)
+    extends TreeTypeError with DivergentImplicitTypeError {
     def errMsg: String   = errMsgForPt(pt0)
     def withPt(pt: Type): AbsTypeError = this.copy(pt0 = pt)
     private def errMsgForPt(pt: Type) =
@@ -154,12 +163,12 @@ trait ContextErrors {
     issueNormalTypeError(tree, errMsg)
   }
 
-  trait TyperContextErrors {
+  trait DefaultTyperContextErrors extends TyperContextErrors {
     self: Typer =>
 
     import infer.setError
 
-    object TyperErrorGen {
+    object TyperErrorGen extends TyperErrorGenObject {
       implicit val contextTyperErrorGen: Context = infer.getContext
 
       def UnstableTreeError(tree: Tree) = {
@@ -746,9 +755,6 @@ trait ContextErrors {
         NormalTypeError(expandee, "too many argument lists for " + fun)
       }
 
-
-      case object MacroExpansionException extends Exception with scala.util.control.ControlThrowable
-
       protected def macroExpansionError(expandee: Tree, msg: String, pos: Position = NoPosition) = {
         def msgForLog = if (msg != null && (msg contains "exception during macro expansion")) msg.split(EOL).drop(1).headOption.getOrElse("?") else msg
         macroLogLite("macro expansion has failed: %s".format(msgForLog))
@@ -861,7 +867,7 @@ trait ContextErrors {
     )
   }
 
-  trait InferencerContextErrors {
+  trait DefaultInferencerContextErrors extends InferencerContextErrors {
     self: Inferencer =>
 
     private def applyErrorMsg(tree: Tree, msg: String, argtpes: List[Type], pt: Type) = {
@@ -876,7 +882,7 @@ trait ContextErrors {
       }
     }
 
-    object InferErrorGen {
+    object InferErrorGen extends InferErrorGenObject {
 
       implicit val contextInferErrorGen = getContext
 
@@ -1050,10 +1056,10 @@ trait ContextErrors {
     }
   }
 
-  trait NamerContextErrors {
+  trait DefaultNamerContextErrors extends NamerContextErrors {
     self: Namer =>
 
-    object NamerErrorGen {
+    object NamerErrorGen extends NamerErrorGenObject {
 
       implicit val contextNamerErrorGen = context
 
@@ -1248,7 +1254,7 @@ trait ContextErrors {
     }
 
     def DivergingImplicitExpansionError(tree: Tree, pt: Type, sym: Symbol)(implicit context0: Context) =
-      issueTypeError(DivergentImplicitTypeError(tree, pt, sym))
+      issueTypeError(DefaultDivergentImplicitTypeError(tree, pt, sym))
   }
 
   object NamesDefaultsErrorsGen {

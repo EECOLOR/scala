@@ -14,19 +14,19 @@ import scala.reflect.ClassTag
  *  @author Lukas Rytz
  *  @version 1.0
  */
-trait NamesDefaults { self: Analyzer =>
+trait DefaultNamesDefaults extends NamesDefaults { 
+  //self: Analyzer =>
+  self: Globals with 
+  DefaultContextErrors with 
+  Namers with
+  Typers with 
+  Contexts with
+  Infer =>
 
   import global._
   import definitions._
   import NamesDefaultsErrorsGen._
   import treeInfo.WildcardStarArg
-
-  // Default getters of constructors are added to the companion object in the
-  // typeCompleter of the constructor (methodSig). To compute the signature,
-  // we need the ClassDef. To create and enter the symbols into the companion
-  // object, we need the templateNamer of that module class. These two are stored
-  // as an attachment in the companion module symbol
-  class ConstructorDefaultsAttachment(val classWithDefault: ClassDef, var companionModuleClassNamer: Namer)
 
   // To attach the default getters of local (term-owned) methods to the method symbol.
   // Used in Namer.enterExistingSym: it needs to re-enter the method symbol and also
@@ -35,13 +35,13 @@ trait NamesDefaults { self: Analyzer =>
     def this(default: Symbol) = this(mutable.Set(default))
   }
 
-  case class NamedApplyInfo(
+  case class DefaultNamedApplyInfo(
     qual:       Option[Tree],
     targs:      List[Tree],
     vargss:     List[List[Tree]],
     blockTyper: Typer
-  ) { }
-
+  ) extends NamedApplyInfo
+  
   private def nameOfNamedArg(arg: Tree) = Some(arg) collect { case AssignOrNamedArg(Ident(name), _) => name }
   def isNamedArg(arg: Tree) = arg match {
     case AssignOrNamedArg(Ident(_), _) => true
@@ -184,14 +184,14 @@ trait NamesDefaults { self: Analyzer =>
         val b = Block(List(vd), baseFunTransformed)
                   .setType(baseFunTransformed.tpe).setPos(baseFun.pos.makeTransparent)
         context.namedApplyBlockInfo =
-          Some((b, NamedApplyInfo(Some(newQual), defaultTargs, Nil, blockTyper)))
+          Some((b, DefaultNamedApplyInfo(Some(newQual), defaultTargs, Nil, blockTyper)))
         b
       }
 
       def blockWithoutQualifier(defaultQual: Option[Tree]) = {
         val b = atPos(baseFun.pos)(Block(Nil, baseFun).setType(baseFun.tpe))
         context.namedApplyBlockInfo =
-          Some((b, NamedApplyInfo(defaultQual, defaultTargs, Nil, blockTyper)))
+          Some((b, DefaultNamedApplyInfo(defaultQual, defaultTargs, Nil, blockTyper)))
         b
       }
 
@@ -365,7 +365,7 @@ trait NamesDefaults { self: Analyzer =>
               res.setPos(res.pos.makeTransparent)
               val block = Block(stats ::: valDefs.flatten, res).setType(res.tpe).setPos(tree.pos.makeTransparent)
               context.namedApplyBlockInfo =
-                Some((block, NamedApplyInfo(qual, targs, vargss :+ refArgs, blockTyper)))
+                Some((block, DefaultNamedApplyInfo(qual, targs, vargss :+ refArgs, blockTyper)))
               block
             case _ => tree
           }

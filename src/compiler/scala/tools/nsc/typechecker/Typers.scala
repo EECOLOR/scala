@@ -26,8 +26,21 @@ import Mode._
  *  @author  Martin Odersky
  *  @version 1.0
  */
-trait Typers extends Adaptations with Tags with TypersTracking with PatternTypers {
-  self: Analyzer =>
+trait DefaultTypers extends Typers with Adaptations with Tags with TypersTracking with PatternTypers with TypeDiagnostics with EtaExpansion {
+  //self: Analyzer =>
+  self: Globals with 
+  Implicits with  
+  Contexts with 
+  DefaultContextErrors with /* Required because we extend DefaultTyperContextErrors */
+  Unapplies with
+  DefaultInfer with /* Required because we are creating an instance of DefaultInferencer */
+  Macros with
+  Namers with 
+  AnalyzerPlugins with
+  StdAttachments with
+  SyntheticMethods with
+  NamesDefaults with 
+  ast.TreeDSL =>
 
   import global._
   import definitions._
@@ -55,28 +68,28 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
     resetDocComments()
   }
 
-  sealed abstract class SilentResult[+T] {
+  sealed abstract class DefaultSilentResult[+T] extends SilentResult[T] {
     def isEmpty: Boolean
     def nonEmpty = !isEmpty
 
-    @inline final def fold[U](none: => U)(f: T => U): U = this match {
+    @inline final def fold[U](none: => U)(f: T => U): U = (this:SilentResult[T]) match {
       case SilentResultValue(value) => f(value)
       case _                        => none
     }
-    @inline final def map[U](f: T => U): SilentResult[U] = this match {
-      case SilentResultValue(value) => SilentResultValue(f(value))
+    @inline final def map[U](f: T => U): SilentResult[U] = (this:SilentResult[T]) match {
+      case SilentResultValue(value) => DefaultSilentResultValue(f(value))
       case x: SilentTypeError       => x
     }
-    @inline final def filter(p: T => Boolean): SilentResult[T] = this match {
-      case SilentResultValue(value) if !p(value) => SilentTypeError(TypeErrorWrapper(new TypeError(NoPosition, "!p")))
+    @inline final def filter(p: T => Boolean): SilentResult[T] = (this:SilentResult[T]) match {
+      case SilentResultValue(value) if !p(value) => DefaultSilentTypeError(TypeErrorWrapper(new TypeError(NoPosition, "!p")))
       case _                                     => this
   }
-    @inline final def orElse[T1 >: T](f: Seq[AbsTypeError] => T1): T1 = this match {
+    @inline final def orElse[T1 >: T](f: Seq[AbsTypeError] => T1): T1 = (this:SilentResult[T]) match {
       case SilentResultValue(value) => value
       case s : SilentTypeError      => f(s.reportableErrors)
     }
   }
-  class SilentTypeError private(val errors: List[AbsTypeError]) extends SilentResult[Nothing] {
+  class DefaultSilentTypeError private(val errors: List[AbsTypeError]) extends DefaultSilentResult[Nothing] with SilentResult[Nothing] with SilentTypeError {
     override def isEmpty = true
     def err: AbsTypeError = errors.head
     def reportableErrors = errors match {
@@ -86,16 +99,15 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
         all
     }
   }
-  object SilentTypeError {
-    def apply(errors: AbsTypeError*): SilentTypeError = new SilentTypeError(errors.toList)
-    def unapply(error: SilentTypeError): Option[AbsTypeError] = error.errors.headOption
+  object DefaultSilentTypeError {
+    def apply(errors: AbsTypeError*): SilentTypeError = new DefaultSilentTypeError(errors.toList)
   }
 
-  case class SilentResultValue[+T](value: T) extends SilentResult[T] { override def isEmpty = false }
+  case class DefaultSilentResultValue[+T](value: T) extends DefaultSilentResult[T] with SilentResultValue[T] { override def isEmpty = false }
+  
+  def newTyper(context: Context): DefaultTyper = new NormalTyper(context)
 
-  def newTyper(context: Context): Typer = new NormalTyper(context)
-
-  private class NormalTyper(context : Context) extends Typer(context)
+  private class NormalTyper(context : Context) extends DefaultTyper(context)
 
   // A transient flag to mark members of anonymous classes
   // that are turned private by typedBlock
@@ -104,7 +116,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
   private final val InterpolatorCodeRegex  = """\$\{.*?\}""".r
   private final val InterpolatorIdentRegex = """\$[$\w]+""".r // note that \w doesn't include $
 
-  abstract class Typer(context0: Context) extends TyperDiagnostics with Adaptation with Tag with PatternTyper with TyperContextErrors {
+  abstract class DefaultTyper(context0: Context) extends Typer with DefaultTyperDiagnostics with Adaptation with Tag with PatternTyper with DefaultTyperContextErrors {
     import context0.unit
     import typeDebug.{ ptTree, ptBlock, ptLine, inGreen, inRed }
     import TyperErrorGen._
@@ -113,8 +125,8 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
 
     private val transformed: mutable.Map[Tree, Tree] = unit.transformed
 
-    val infer = new Inferencer {
-      def context = Typer.this.context
+    val infer:Inferencer = new DefaultInferencer {
+      def context = DefaultTyper.this.context
       // See SI-3281 re undoLog
       override def isCoercible(tp: Type, pt: Type) = undoLog undo viewExists(tp, pt)
     }
@@ -443,14 +455,14 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
     /** The typer for an expression, depending on where we are. If we are before a superclass
      *  call, this is a typer over a constructor context; otherwise it is the current typer.
      */
-    final def constrTyperIf(inConstr: Boolean): Typer =
+    final def constrTyperIf(inConstr: Boolean): DefaultTyper =
       if (inConstr) {
         assert(context.undetparams.isEmpty, context.undetparams)
         newTyper(context.makeConstructorContext)
       } else this
 
     @inline
-    final def withCondConstrTyper[T](inConstr: Boolean)(f: Typer => T): T =
+    final def withCondConstrTyper[T](inConstr: Boolean)(f: DefaultTyper => T): T =
       if (inConstr) {
         assert(context.undetparams.isEmpty, context.undetparams)
         val c = context.makeConstructorContext
@@ -460,17 +472,17 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
       }
 
     @inline
-    final def typerWithCondLocalContext[T](c: => Context)(cond: Boolean)(f: Typer => T): T =
+    final def typerWithCondLocalContext[T](c: => Context)(cond: Boolean)(f: DefaultTyper => T): T =
       if (cond) typerWithLocalContext(c)(f) else f(this)
 
     @inline
-    final def typerWithLocalContext[T](c: Context)(f: Typer => T): T =
+    final def typerWithLocalContext[T](c: Context)(f: DefaultTyper => T): T =
       c.reporter.propagatingErrorsTo(context.reporter)(f(newTyper(c)))
 
     /** The typer for a label definition. If this is part of a template we
      *  first have to enter the label definition.
      */
-    def labelTyper(ldef: LabelDef): Typer =
+    def labelTyper(ldef: LabelDef): DefaultTyper =
       if (ldef.symbol == NoSymbol) { // labeldef is part of template
         val typer1 = newTyper(context.makeNewScope(ldef, context.owner))
         typer1.enterLabelDef(ldef)
@@ -519,7 +531,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
      *  (illegal type applications in pre will be skipped -- that's why typedSelect wraps the resulting tree in a TreeWithDeferredChecks)
      *  @return modified tree and new prefix type
      */
-    private def makeAccessible(tree: Tree, sym: Symbol, pre: Type, site: Tree): (Tree, Type) =
+    def makeAccessible(tree: Tree, sym: Symbol, pre: Type, site: Tree): (Tree, Type) =
       if (context.isInPackageObject(sym, pre.typeSymbol)) {
         if (pre.typeSymbol == ScalaPackageClass && sym.isTerm) {
           // short cut some aliases. It seems pattern matching needs this
@@ -661,8 +673,8 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
       @inline def wrapResult(reporter: ContextReporter, result: T) =
         if (reporter.hasErrors) {
           stopStats()
-          SilentTypeError(reporter.errors: _*)
-        } else SilentResultValue(result)
+          DefaultSilentTypeError(reporter.errors: _*)
+        } else DefaultSilentResultValue(result)
 
       try {
         if (context.reportErrors ||
@@ -696,7 +708,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
           // fallback in case TypeError is still thrown
           // @H this happens for example in cps annotation checker
           stopStats()
-          SilentTypeError(TypeErrorWrapper(ex))
+          DefaultSilentTypeError(TypeErrorWrapper(ex))
       }
     }
 
@@ -1234,6 +1246,19 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
       else qual
     }
 
+    private object MemberWildcardMethodType {
+      private val dummyMethod = NoSymbol.newTermSymbol("typer$dummy") setInfo NullaryMethodType(AnyTpe)
+      private def templateArgType(argtpe: Type) = new BoundedWildcardType(TypeBounds.lower(argtpe))
+
+      /**
+       * Creates a ? { name: (? >: argtpe <: Any*)restp }
+       */
+      def apply(name: Name, argtpes: List[Type], restpe: Type): Type = {
+        val mtpe = MethodType(dummyMethod.newSyntheticValueParams(argtpes map templateArgType), restpe)
+        memberWildcardType(name, mtpe)
+      }
+    }
+    
     /** Try to apply an implicit conversion to `qual` to that it contains
      *  a method `name` which can be applied to arguments `args` with expected type `pt`.
      *  If `pt` is defined, there is a fallback to try again with pt = ?.
@@ -1245,7 +1270,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
     def adaptToArguments(qual: Tree, name: Name, args: List[Tree], pt: Type, reportAmbiguous: Boolean, saveErrors: Boolean): Tree = {
       def doAdapt(restpe: Type) =
         //util.trace("adaptToArgs "+qual+", name = "+name+", argtpes = "+(args map (_.tpe))+", pt = "+pt+" = ")
-        adaptToMember(qual, HasMethodMatching(name, args map (_.tpe), restpe), reportAmbiguous, saveErrors)
+        adaptToMember(qual, MemberWildcardMethodType(name, args map (_.tpe), restpe), reportAmbiguous, saveErrors)
 
       if (pt == WildcardType)
         doAdapt(pt)
@@ -1254,6 +1279,13 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
       )
     }
 
+   /** An extractor for types of the form ? { name: ? }
+     */
+    private object HasMember {
+      private val hasMemberCache = perRunCaches.newMap[Name, Type]()
+      def apply(name: Name): Type = hasMemberCache.getOrElseUpdate(name, memberWildcardType(name, WildcardType))
+    }
+    
     /** Try to apply an implicit conversion to `qual` so that it contains
      *  a method `name`. If that's ambiguous try taking arguments into
      *  account using `adaptToArguments`.
@@ -1901,7 +1933,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
       val body2 = {
         val body2 =
           if (isPastTyper || reporter.hasErrors) body1
-          else body1 flatMap rewrappingWrapperTrees(namer.addDerivedTrees(Typer.this, _))
+          else body1 flatMap rewrappingWrapperTrees(namer.addDerivedTrees(DefaultTyper.this, _))
         val primaryCtor = treeInfo.firstConstructor(body2)
         val primaryCtor1 = primaryCtor match {
           case DefDef(_, _, _, _, _, Block(earlyVals :+ global.pendingSuperCall, unit)) =>
@@ -2371,7 +2403,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
         val stats1 = if (isPastTyper) block.stats else
           block.stats.flatMap(stat => stat match {
             case vd@ValDef(_, _, _, _) if vd.symbol.isLazy =>
-              namer.addDerivedTrees(Typer.this, vd)
+              namer.addDerivedTrees(DefaultTyper.this, vd)
             case _ => stat::Nil
             })
         val stats2 = typedStats(stats1, context.owner)
@@ -2469,7 +2501,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
         else newTyper(context.makeImplicit(reportAmbiguousErrors = false)).silent(_.typed(Ident(vpmName._match)), reportAmbiguousErrors = false) orElse (_ => null)
 
       if (matchStrategy ne null) // virtualize
-        typed((new PureMatchTranslator(this.asInstanceOf[patmat.global.analyzer.Typer] /*TODO*/, matchStrategy)).translateMatch(match_), mode, pt)
+        typed((new PureMatchTranslator(this.asInstanceOf[global.patmat.global.analyzer.Typer] /* TODO */, matchStrategy)).translateMatch(match_), mode, pt)
       else
         match_ // will be translated in phase `patmat`
     }
@@ -3249,6 +3281,10 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
         } else fun
       }
 
+      object HasUnapply {
+        def unapply(tp: Type): Option[Symbol] = unapplyMember(tp).toOption
+      }
+      
       val fun = preSelectOverloaded(fun0)
 
       fun.tpe match {
@@ -3363,7 +3399,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
             } else if (lencmp == 0) {
               // we don't need defaults. names were used, so this application is transformed
               // into a block (@see transformNamedApplication in NamesDefaults)
-              val (namelessArgs, argPos) = removeNames(Typer.this)(args, params)
+              val (namelessArgs, argPos) = removeNames(DefaultTyper.this)(args, params)
               if (namelessArgs exists (_.isErroneous)) {
                 duplErrTree
               } else if (!allArgsArePositional(argPos) && !sameLength(formals, params))
@@ -3376,7 +3412,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
                 doTypedApply(tree, fun, namelessArgs, mode, pt)
               } else {
                 checkNotMacro()
-                transformNamedApplication(Typer.this, mode, pt)(
+                transformNamedApplication(DefaultTyper.this, mode, pt)(
                                           treeCopy.Apply(tree, fun, namelessArgs), argPos)
               }
             } else {
@@ -3406,7 +3442,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
                 symsOwnedByContextOwner foreach (_.owner = context.owner)
               }
 
-              val fun1 = transformNamedApplication(Typer.this, mode, pt)(fun, x => x)
+              val fun1 = transformNamedApplication(DefaultTyper.this, mode, pt)(fun, x => x)
               if (fun1.isErroneous) duplErrTree
               else {
                 assert(isNamedApplyBlock(fun1), fun1)
@@ -3426,7 +3462,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
                 if (!sameLength(allArgs, args) && callToCompanionConstr(context, funSym)) {
                   duplErrorTree(ModuleUsingCompanionClassDefaultArgsErrror(tree))
                 } else if (lencmp2 > 0) {
-                  removeNames(Typer.this)(allArgs, params) // #3818
+                  removeNames(DefaultTyper.this)(allArgs, params) // #3818
                   duplErrTree
                 } else if (lencmp2 == 0) {
                   // useful when a default doesn't match parameter type, e.g. def f[T](x:T="a"); f[Int]()
@@ -5137,7 +5173,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
         }
 
         //@M TODO: context.undetparams = undets_fun ?
-        Typer.this.typedTypeApply(tree, mode, fun1, args1)
+        DefaultTyper.this.typedTypeApply(tree, mode, fun1, args1)
       }
 
       def typedApplyDynamic(tree: ApplyDynamic) = {
@@ -5406,7 +5442,7 @@ trait Typers extends Adaptations with Tags with TypersTracking with PatternTyper
           typingStack.showAdapt(tree1, result, ptPlugins, context)
 
         if (!isPastTyper)
-          signalDone(context.asInstanceOf[analyzer.Context], tree, result)
+          signalDone(context.asInstanceOf[global.analyzer.Context], tree, result)
 
         result
       }
